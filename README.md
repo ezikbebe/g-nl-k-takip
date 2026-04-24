@@ -1,1 +1,1 @@
-# g-nl-k-takip
+# gunluk takip
