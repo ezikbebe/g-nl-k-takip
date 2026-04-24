@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPOR — Günlük Takip</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --surface3: #26262e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f2;
+    --muted: #8a8a9a;
+    --pink: #e060a0;
+    --pink2: #f080b8;
+    --cyan: #40d0c0;
+    --cyan2: #60e8d8;
+    --green: #40b870;
+    --amber: #e0a030;
+    --purple: #9060e0;
+    --red: #e05060;
+    --tag-bg: rgba(255,255,255,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  .app { max-width: 700px; margin: 0 auto; padding: 20px 14px 60px; }
+
+  /* HEADER */
+  .header { margin-bottom: 20px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .header h1 { font-size: 32px; font-weight: 900; letter-spacing: -1.5px; background: linear-gradient(90deg, var(--pink), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .header .date { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--surface); border-radius: 12px; padding: 4px; border: 1px solid var(--border); }
+  .tab { flex: 1; padding: 9px 6px; border-radius: 9px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .tab.active { background: var(--surface3); color: var(--text); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* TAB PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* WEEK NAV */
+  .week-nav { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+  .week-nav::-webkit-scrollbar { height: 0; }
+  .day-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; min-width: 52px; transition: all 0.15s; flex-shrink: 0; }
+  .day-pill:hover { border-color: var(--border2); }
+  .day-pill.active { background: var(--pink); border-color: transparent; }
+  .day-pill .dn { font-size: 11px; font-weight: 600; opacity: 0.7; }
+  .day-pill .dd { font-size: 20px; font-weight: 800; line-height: 1.1; }
+  .day-pill .dl { font-size: 10px; opacity: 0.6; margin-top: 1px; }
+
+  /* PROGRESS */
+  .prog-wrap { background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--border); }
+  .prog-top { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+  .prog-top span { color: var(--muted); }
+  .prog-top strong { color: var(--cyan); }
+  .prog-bar { height: 5px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--pink), var(--cyan)); border-radius: 99px; transition: width 0.4s; }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .btn { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+  .btn:hover { background: var(--surface2); border-color: var(--pink); color: var(--pink); }
+  .btn.primary { background: var(--pink); border-color: transparent; color: #fff; }
+  .btn.primary:hover { background: var(--pink2); color: #fff; }
+
+  /* TIMELINE */
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.15s; }
+  .task-card:hover { border-color: var(--border2); }
+  .task-card.done { opacity: 0.55; }
+  .task-card.done .task-title { text-decoration: line-through; }
+  .task-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 10px; cursor: pointer; }
+  .task-time { font-size: 12px; color: var(--muted); min-width: 38px; margin-top: 2px; }
+  .task-body { flex: 1; }
+  .task-title { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .task-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; background: var(--tag-bg); border: 1px solid var(--border); color: var(--muted); }
+  .tag.pink { background: rgba(224,96,160,0.15); border-color: rgba(224,96,160,0.3); color: var(--pink2); }
+  .tag.cyan { background: rgba(64,208,192,0.12); border-color: rgba(64,208,192,0.25); color: var(--cyan); }
+  .tag.green { background: rgba(64,184,112,0.12); border-color: rgba(64,184,112,0.25); color: var(--green); }
+  .tag.amber { background: rgba(224,160,48,0.12); border-color: rgba(224,160,48,0.25); color: var(--amber); }
+  .tag.purple { background: rgba(144,96,224,0.12); border-color: rgba(144,96,224,0.25); color: var(--purple); }
+  .task-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border2); background: transparent; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; transition: all 0.15s; }
+  .task-check:hover { border-color: var(--pink); }
+  .task-card.done .task-check { background: var(--green); border-color: var(--green); }
+  .task-check svg { display: none; }
+  .task-card.done .task-check svg { display: block; }
+  .task-expand { max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+  .task-expand.open { max-height: 500px; }
+  .task-detail { padding: 12px 14px 14px; border-top: 1px solid var(--border); }
+  .note-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 100%; min-height: 60px; padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; outline: none; margin-top: 6px; }
+  .note-box:focus { border-color: var(--pink); }
+  .note-label { font-size: 11px; color: var(--muted); }
+  .edit-row { display: flex; gap: 6px; margin-top: 10px; }
+  .mini-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface3); color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+  .mini-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .mini-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* SECTION HEADS */
+  .section-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 20px 0 10px; padding-left: 2px; }
+
+  /* ── WORKOUT PANEL ── */
+  .workout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .workout-day-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .workout-day-card.active-day { border-color: rgba(224,96,160,0.5); }
+  .wd-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .wd-name { font-size: 14px; font-weight: 700; }
+  .wd-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: rgba(224,96,160,0.15); color: var(--pink2); border: 1px solid rgba(224,96,160,0.3); }
+  .wd-badge.rest { background: rgba(138,138,154,0.1); color: var(--muted); border-color: var(--border); }
+  .exercise-list { display: flex; flex-direction: column; gap: 6px; }
+  .exercise-item { background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
+  .ex-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .ex-sets { display: flex; gap: 5px; flex-wrap: wrap; }
+  .set-pill { font-size: 11px; padding: 2px 7px; border-radius: 20px; background: var(--surface3); color: var(--muted); border: 1px solid var(--border); cursor: pointer; transition: all 0.12s; }
+  .set-pill.logged { background: rgba(64,184,112,0.15); color: var(--green); border-color: rgba(64,184,112,0.3); }
+  .ex-note { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .add-ex-row { display: flex; gap: 6px; margin-top: 10px; }
+  .mini-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; width: 100%; }
+  .mini-input:focus { border-color: var(--cyan); }
+
+  /* ── NUTRITION PANEL ── */
+  .macro-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .macro-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px; text-align: center; }
+  .macro-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .macro-val { font-size: 22px; font-weight: 800; line-height: 1; }
+  .macro-val.cal { color: var(--amber); }
+  .macro-val.pro { color: var(--pink2); }
+  .macro-val.carb { color: var(--cyan); }
+  .macro-val.fat { color: var(--purple); }
+  .macro-target { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .macro-bar { height: 3px; border-radius: 99px; background: var(--surface3); margin-top: 6px; overflow: hidden; }
+  .macro-bar-fill { height: 100%; border-radius: 99px; transition: width 0.3s; }
+  .meal-list { display: flex; flex-direction: column; gap: 8px; }
+  .meal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .meal-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; }
+  .meal-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .meal-info { flex: 1; }
+  .meal-name { font-size: 14px; font-weight: 600; }
+  .meal-macro { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .meal-kcal { font-size: 13px; font-weight: 700; color: var(--amber); }
+  .meal-body { max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+  .meal-body.open { max-height: 600px; }
+  .meal-detail { padding: 0 14px 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .food-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .food-row:last-child { border-bottom: none; }
+  .food-name { flex: 1; font-size: 13px; }
+  .food-amount { font-size: 12px; color: var(--muted); min-width: 60px; text-align: right; }
+  .food-kcal { font-size: 12px; color: var(--amber); min-width: 50px; text-align: right; }
+  .food-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; }
+  .food-del:hover { color: var(--red); }
+  .add-food-row { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+  .water-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  .water-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .water-top span { font-size: 13px; color: var(--muted); }
+  .water-count { font-size: 20px; font-weight: 800; color: var(--cyan); }
+  .water-glasses { display: flex; gap: 6px; flex-wrap: wrap; }
+  .glass { width: 32px; height: 32px; border-radius: 8px; border: 2px solid var(--border2); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.12s; }
+  .glass.filled { background: rgba(64,208,192,0.2); border-color: var(--cyan); }
+  .glass:hover { border-color: var(--cyan); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 18px; padding: 22px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--pink2); }
+  .modal label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 12px; }
+  .modal input, .modal select, .modal textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; outline: none; }
+  .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--pink); }
+  .modal select option { background: var(--surface); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+  @media (max-width: 480px) {
+    .macro-cards { grid-template-columns: repeat(2, 1fr); }
+    .workout-grid { grid-template-columns: 1fr; }
+    .day-pill { min-width: 44px; padding: 7px 8px; }
+    .day-pill .dd { font-size: 17px; }
+    .tabs .tab { font-size: 11px; padding: 8px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div>
+      <h1>SPOR</h1>
+      <div class="date" id="headerDate"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('gunluk')">📋 Günlük</button>
+    <button class="tab" onclick="switchTab('antrenman')">💪 Antrenman</button>
+    <button class="tab" onclick="switchTab('beslenme')">🥗 Beslenme</button>
+  </div>
+
+  <!-- ══════════════ GÜNLÜK PANELİ ══════════════ -->
+  <div class="panel active" id="panel-gunluk">
+    <div class="week-nav" id="weekNav"></div>
+    <div class="prog-wrap">
+      <div class="prog-top"><span id="progLabel">Yükleniyor...</span><strong id="progPct">0%</strong></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAddModal()">+ Görev Ekle</button>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <!-- ══════════════ ANTRENMAN PANELİ ══════════════ -->
+  <div class="panel" id="panel-antrenman">
+    <div class="section-head">Haftalık Program</div>
+    <div class="workout-grid" id="workoutGrid"></div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="openWorkoutDayModal()">+ Gün Ekle / Düzenle</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ BESLENME PANELİ ══════════════ -->
+  <div class="panel" id="panel-beslenme">
+    <div class="section-head">Günlük Makro</div>
+    <div class="macro-cards" id="macroCards"></div>
+
+    <div class="water-wrap">
+      <div class="water-top">
+        <span>💧 Su tüketimi</span>
+        <span class="water-count"><span id="waterCount">0</span> / <span id="waterTarget">8</span> bardak</span>
+      </div>
+      <div class="water-glasses" id="waterGlasses"></div>
+    </div>
+
+    <div class="section-head">Öğünler</div>
+    <div class="meal-list" id="mealList"></div>
+    <div class="toolbar" style="margin-top:12px">
+      <button class="btn primary" onclick="openAddMealModal()">+ Öğün Ekle</button>
+      <button class="btn" onclick="openMacroTargetModal()">⚙ Hedefler</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalInner"></div>
+</div>
+
+<script>
+const DAYS_TR = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const TAG_COLORS = ['','pink','cyan','green','amber','purple'];
+
+// ── STATE ──
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem('spor_v2') || 'null');
+  } catch(e) { return null; }
+}
+function saveState() {
+  localStorage.setItem('spor_v2', JSON.stringify(S));
+}
+
+const defaultTasks = [
+  {id:1, time:'08:30', title:'GH (Aç Karna)', tags:[{label:'GH 3 IU',color:'purple'}], done:false, note:'', highlight:''},
+  {id:2, time:'09:00', title:'Sabah Supplement', tags:[{label:'Probiyota',color:''},{label:'B12',color:'cyan'},{label:'Arimidex 0.5mg',color:'pink'}], done:false, note:'', highlight:''},
+  {id:3, time:'09:30', title:'Kahvaltı', tags:[{label:'Kahvaltı',color:''},{label:'D3',color:'amber'},{label:'Omega-3',color:'cyan'},{label:'Milk Thistle',color:'green'},{label:'Bromelain',color:''},{label:'Gentle Iron',color:''}], done:false, note:'', highlight:''},
+  {id:4, time:'12:30', title:'Öğle', tags:[{label:'Öğle Yemeği',color:''},{label:'No Niacin',color:'amber'},{label:'Omega-3 (2.doz)',color:'cyan'}], done:false, note:'', highlight:''},
+  {id:5, time:'15:30', title:'Pre-Workout', tags:[{label:'Rice Cream',color:'amber'},{label:'Selenyum',color:''}], done:false, note:'', highlight:''},
+  {id:6, time:'17:00', title:'🏋️ Antrenman Başlıyor!', tags:[{label:'Pull 2',color:'pink'}], done:false, note:'', highlight:'pink'},
+  {id:7, time:'18:30', title:'Cardio', tags:[{label:'20-25 dk koşu bandı / bisiklet',color:'cyan'}], done:false, note:'', highlight:''},
+  {id:8, time:'19:00', title:'Post-Workout', tags:[{label:'Test Prop ~57mg',color:'pink'},{label:'Masteron ~71mg',color:'pink'},{label:'Whey Protein',color:'green'},{label:'Rice Cream',color:'amber'}], done:false, note:'', highlight:''},
+  {id:9, time:'20:00', title:'Akşam Yemeği', tags:[{label:'Akşam Yemeği',color:''}], done:false, note:'', highlight:''},
+  {id:10, time:'22:00', title:'Zinc + Ator', tags:[{label:'Zinc — aç karnına',color:'amber'},{label:'Atorvastatin 20mg',color:'cyan'}], done:false, note:'', highlight:'red'},
+];
+
+const defaultWorkout = [
+  { day:'Pazartesi', label:'PUŞ', exercises:[
+    {name:'Bench Press', sets:['4x8','@80kg'], note:'Göğüs ortası hissine odaklan'},
+    {name:'Overhead Press', sets:['3x8','@50kg'], note:''},
+    {name:'Incline DB Press', sets:['3x10','@22kg'], note:''},
+    {name:'Lateral Raise', sets:['4x15','@10kg'], note:''},
+    {name:'Tricep Pushdown', sets:['3x12','@'], note:''},
+  ], logged:{}},
+  { day:'Salı', label:'ÇEKİŞ', exercises:[
+    {name:'Deadlift', sets:['4x5','@120kg'], note:''},
+    {name:'Barbell Row', sets:['4x8','@70kg'], note:''},
+    {name:'Pull-Up', sets:['3x8','BW'], note:''},
+    {name:'Face Pull', sets:['3x15','@'], note:''},
+    {name:'Bicep Curl', sets:['3x12','@16kg'], note:''},
+  ], logged:{}},
+  { day:'Çarşamba', label:'BACAK', exercises:[
+    {name:'Squat', sets:['4x8','@100kg'], note:'Derin in'},
+    {name:'Leg Press', sets:['3x12','@160kg'], note:''},
+    {name:'Romanian DL', sets:['3x10','@70kg'], note:''},
+    {name:'Leg Curl', sets:['3x12','@'], note:''},
+    {name:'Calf Raise', sets:['4x15','@'], note:''},
+  ], logged:{}},
+  { day:'Perşembe', label:'PUŞ 2', exercises:[
+    {name:'DB Shoulder Press', sets:['4x10','@24kg'], note:''},
+    {name:'Cable Fly', sets:['3x12','@'], note:''},
+    {name:'Dips', sets:['3x10','BW'], note:''},
+  ], logged:{}},
+  { day:'Cuma', label:'ÇEKİŞ 2', exercises:[
+    {name:'Weighted Pull-Up', sets:['4x6','@10kg'], note:''},
+    {name:'Seal Row', sets:['3x10','@60kg'], note:''},
+    {name:'Hammer Curl', sets:['3x12','@16kg'], note:''},
+  ], logged:{}},
+  { day:'Cumartesi', label:'YÜZ', exercises:[
+    {name:'Freestyle', sets:['10x100m'], note:'Tempolu'},
+    {name:'Sırtüstü', sets:['5x50m'], note:''},
+  ], logged:{}},
+  { day:'Pazar', label:'YÜZ', exercises:[
+    {name:'Açık Su / Havuz', sets:['30dk'], note:'Hafif tempo'},
+  ], logged:{}},
+];
+
+const defaultMeals = [
+  { id:1, name:'Kahvaltı', icon:'🌅', color:'#e0a030', foods:[
+    {name:'Yumurta', amount:'3 adet', kcal:210, protein:18, carb:2, fat:15},
+    {name:'Ekmek', amount:'2 dilim', kcal:160, protein:5, carb:30, fat:2},
+    {name:'Peynir', amount:'50g', kcal:150, protein:10, carb:1, fat:12},
+  ]},
+  { id:2, name:'Öğle', icon:'☀️', color:'#40d0c0', foods:[
+    {name:'Tavuk Göğsü', amount:'200g', kcal:220, protein:42, carb:0, fat:5},
+    {name:'Pirinç Pilavı', amount:'150g', kcal:195, protein:4, carb:42, fat:1},
+    {name:'Salata', amount:'1 kase', kcal:40, protein:2, carb:6, fat:1},
+  ]},
+  { id:3, name:'Pre-Workout', icon:'⚡', color:'#e060a0', foods:[
+    {name:'Rice Cream', amount:'50g', kcal:190, protein:2, carb:43, fat:1},
+  ]},
+  { id:4, name:'Post-Workout', icon:'💪', color:'#40b870', foods:[
+    {name:'Whey Protein', amount:'1 ölçek', kcal:120, protein:25, carb:5, fat:2},
+    {name:'Rice Cream', amount:'50g', kcal:190, protein:2, carb:43, fat:1},
+  ]},
+  { id:5, name:'Akşam', icon:'🌙', color:'#9060e0', foods:[
+    {name:'Kırmızı Et', amount:'200g', kcal:300, protein:40, carb:0, fat:15},
+    {name:'Tatlı Patates', amount:'150g', kcal:130, protein:2, carb:30, fat:0},
+    {name:'Brokoli', amount:'100g', kcal:35, protein:3, carb:7, fat:0},
+  ]},
+];
+
+const defaultMacroTargets = { kcal: 3200, protein: 220, carb: 350, fat: 90 };
+const defaultWater = { glasses: 8, drunk: 0 };
+
+let saved = loadState();
+let S = saved || {
+  tasks: defaultTasks,
+  selectedDate: new Date().toDateString(),
+  workout: defaultWorkout,
+  meals: defaultMeals,
+  macroTargets: defaultMacroTargets,
+  water: defaultWater,
+  mealExpanded: {}
+};
+if (!S.workout) S.workout = defaultWorkout;
+if (!S.meals) S.meals = defaultMeals;
+if (!S.macroTargets) S.macroTargets = defaultMacroTargets;
+if (!S.water) S.water = defaultWater;
+if (!S.mealExpanded) S.mealExpanded = {};
+
+// ── TABS ──
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const ids = ['gunluk','antrenman','beslenme'];
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+}
+
+// ── HEADER & WEEK ──
+function renderHeader() {
+  const d = new Date(S.selectedDate);
+  document.getElementById('headerDate').textContent =
+    `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${d.getFullYear()} — ${DAYS_TR[d.getDay()]}`;
+}
+function getWeekDays() {
+  const today = new Date(); const arr = [];
+  for (let i = -2; i <= 4; i++) { const d = new Date(today); d.setDate(today.getDate()+i); arr.push(d); }
+  return arr;
+}
+function renderWeek() {
+  const nav = document.getElementById('weekNav');
+  const today = new Date().toDateString();
+  nav.innerHTML = getWeekDays().map(d => {
+    const active = d.toDateString() === S.selectedDate ? 'active' : '';
+    const lbl = d.toDateString() === today ? 'Bugün' : '';
+    return `<div class="day-pill ${active}" onclick="selectDay('${d.toDateString()}')">
+      <span class="dn">${DAYS_TR[d.getDay()]}</span>
+      <span class="dd">${d.getDate()}</span>
+      <span class="dl">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+function selectDay(ds) {
+  S.selectedDate = ds; saveState(); renderWeek(); renderHeader();
+}
+
+// ── PROGRESS ──
+function renderProgress() {
+  const t = S.tasks.length, d = S.tasks.filter(x=>x.done).length;
+  const pct = t ? Math.round((d/t)*100) : 0;
+  document.getElementById('progPct').textContent = pct + '%';
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progLabel').textContent = `${d} / ${t} tamamlandı`;
+}
+
+// ── TIMELINE ──
+function renderTimeline() {
+  const el = document.getElementById('timeline');
+  const sorted = [...S.tasks].sort((a,b) => a.time.localeCompare(b.time));
+  el.innerHTML = sorted.map(task => {
+    const bc = task.highlight === 'pink' ? 'rgba(224,96,160,0.5)' :
+               task.highlight === 'red'  ? 'rgba(224,80,96,0.5)' : '';
+    const bs = bc ? `border-color:${bc};` : '';
+    const tags = task.tags.map(t=>`<span class="tag ${t.color||''}">${t.label}</span>`).join('');
+    const noteInd = task.note ? ' 📝' : '';
+    return `<div class="task-card ${task.done?'done':''}" id="card-${task.id}" style="${bs}">
+      <div class="task-head" onclick="toggleExpand(${task.id})">
+        <div class="task-time">${task.time}</div>
+        <div class="task-body">
+          <div class="task-title">${task.title}${noteInd}</div>
+          <div class="task-tags">${tags}</div>
+        </div>
+        <div class="task-check" onclick="event.stopPropagation();toggleDone(${task.id})">
+          <svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </div>
+      </div>
+      <div class="task-expand" id="expand-${task.id}">
+        <div class="task-detail">
+          <div class="note-label">Not</div>
+          <textarea class="note-box" rows="2" placeholder="Not ekle..." onchange="saveNote(${task.id},this.value)">${task.note||''}</textarea>
+          <div class="edit-row">
+            <button class="mini-btn" onclick="openEditTaskModal(${task.id})">Düzenle</button>
+            <button class="mini-btn danger" onclick="deleteTask(${task.id})">Sil</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleExpand(id) { document.getElementById('expand-'+id).classList.toggle('open'); }
+function toggleDone(id) {
+  const t = S.tasks.find(x=>x.id===id); if(t){ t.done=!t.done; saveState(); renderTimeline(); renderProgress(); }
+}
+function saveNote(id,val) {
+  const t = S.tasks.find(x=>x.id===id); if(t){ t.note=val; saveState(); }
+}
+function deleteTask(id) {
+  S.tasks = S.tasks.filter(x=>x.id!==id); saveState(); renderTimeline(); renderProgress();
+}
+
+// ── TASK MODAL ──
+let _modalMode = 'add', _editId = null;
+function openAddModal() {
+  _modalMode='add'; _editId=null;
+  showModal(`<h3>Yeni Görev</h3>
+    <label>Saat</label><input type="time" id="mTime" value="08:00">
+    <label>Başlık</label><input type="text" id="mTitle" placeholder="örn: Sabah kahvaltı">
+    <label>Etiketler (virgülle ayır)</label><input type="text" id="mTags" placeholder="örn: Protein, D3">
+    <label>Renk</label><select id="mColor">
+      <option value="">Varsayılan</option><option value="pink">Pembe</option>
+      <option value="cyan">Turkuaz</option><option value="green">Yeşil</option>
+      <option value="amber">Amber</option><option value="purple">Mor</option>
+    </select>
+    <label>Not</label><textarea id="mNote" rows="2" placeholder="İsteğe bağlı..."></textarea>
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveTaskModal()">Kaydet</button>
+    </div>`);
+}
+function openEditTaskModal(id) {
+  _modalMode='edit'; _editId=id;
+  const t = S.tasks.find(x=>x.id===id);
+  showModal(`<h3>Görevi Düzenle</h3>
+    <label>Saat</label><input type="time" id="mTime" value="${t.time}">
+    <label>Başlık</label><input type="text" id="mTitle" value="${t.title}">
+    <label>Etiketler</label><input type="text" id="mTags" value="${t.tags.map(x=>x.label).join(', ')}">
+    <label>Renk</label><select id="mColor">
+      <option value="">Varsayılan</option><option value="pink" ${t.tags[0]?.color==='pink'?'selected':''}>Pembe</option>
+      <option value="cyan" ${t.tags[0]?.color==='cyan'?'selected':''}>Turkuaz</option>
+      <option value="green" ${t.tags[0]?.color==='green'?'selected':''}>Yeşil</option>
+      <option value="amber" ${t.tags[0]?.color==='amber'?'selected':''}>Amber</option>
+      <option value="purple" ${t.tags[0]?.color==='purple'?'selected':''}>Mor</option>
+    </select>
+    <label>Not</label><textarea id="mNote" rows="2">${t.note||''}</textarea>
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveTaskModal()">Kaydet</button>
+    </div>`);
+}
+function saveTaskModal() {
+  const time = document.getElementById('mTime').value;
+  const title = document.getElementById('mTitle').value.trim();
+  const tagsRaw = document.getElementById('mTags').value;
+  const color = document.getElementById('mColor').value;
+  const note = document.getElementById('mNote').value;
+  if (!title) return;
+  const tags = tagsRaw.split(',').map(s=>s.trim()).filter(Boolean).map(label=>({label,color}));
+  if (_modalMode==='add') {
+    S.tasks.push({id:Date.now(), time, title, tags, done:false, note, highlight:''});
+  } else {
+    const t = S.tasks.find(x=>x.id===_editId);
+    if(t){t.time=time;t.title=title;t.tags=tags;t.note=note;}
+  }
+  saveState(); closeModal(); renderTimeline(); renderProgress();
+}
+
+// ── WORKOUT ──
+function renderWorkout() {
+  const grid = document.getElementById('workoutGrid');
+  const todayName = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][new Date().getDay()];
+  grid.innerHTML = S.workout.map((wd, wi) => {
+    const isToday = wd.day === todayName;
+    const exHTML = wd.exercises.map((ex, ei) => {
+      const setsHTML = ex.sets.map((s, si) => {
+        const key = `${wi}-${ei}-${si}`;
+        const done = wd.logged && wd.logged[key];
+        return `<span class="set-pill ${done?'logged':''}" onclick="toggleSet('${key}',${wi})">${s}</span>`;
+      }).join('');
+      return `<div class="exercise-item">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-sets">${setsHTML}</div>
+        ${ex.note ? `<div class="ex-note">${ex.note}</div>` : ''}
+      </div>`;
+    }).join('');
+    return `<div class="workout-day-card ${isToday?'active-day':''}">
+      <div class="wd-head">
+        <span class="wd-name">${wd.day}</span>
+        <span class="wd-badge ${wd.label==='DİNLENME'?'rest':''}">${wd.label}</span>
+      </div>
+      <div class="exercise-list">${exHTML}</div>
+      <div class="add-ex-row" style="margin-top:10px">
+        <input class="mini-input" id="exName-${wi}" placeholder="Egzersiz adı...">
+        <button class="mini-btn" onclick="addExercise(${wi})">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleSet(key, wi) {
+  if (!S.workout[wi].logged) S.workout[wi].logged = {};
+  S.workout[wi].logged[key] = !S.workout[wi].logged[key];
+  saveState(); renderWorkout();
+}
+function addExercise(wi) {
+  const inp = document.getElementById('exName-'+wi);
+  const name = inp.value.trim(); if(!name) return;
+  S.workout[wi].exercises.push({name, sets:['3x10'], note:''});
+  inp.value=''; saveState(); renderWorkout();
+}
+function openWorkoutDayModal() {
+  showModal(`<h3>Antrenman Günü Ekle</h3>
+    <label>Gün</label>
+    <select id="wDay">
+      ${['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'].map(d=>`<option>${d}</option>`).join('')}
+    </select>
+    <label>Etiket (örn: BACAK, PUŞ, DİNLENME)</label>
+    <input type="text" id="wLabel" placeholder="BACAK">
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveWorkoutDay()">Ekle</button>
+    </div>`);
+}
+function saveWorkoutDay() {
+  const day = document.getElementById('wDay').value;
+  const label = document.getElementById('wLabel').value.trim() || 'ANTRENMAN';
+  const exists = S.workout.findIndex(x=>x.day===day);
+  if (exists>=0) { S.workout[exists].label=label; }
+  else { S.workout.push({day, label, exercises:[], logged:{}}); }
+  saveState(); closeModal(); renderWorkout();
+}
+
+// ── NUTRITION ──
+function calcMacros() {
+  let kcal=0, protein=0, carb=0, fat=0;
+  S.meals.forEach(m => m.foods.forEach(f => {
+    kcal+=f.kcal||0; protein+=f.protein||0; carb+=f.carb||0; fat+=f.fat||0;
+  }));
+  return {kcal, protein, carb, fat};
+}
+function renderMacroCards() {
+  const m = calcMacros(); const t = S.macroTargets;
+  const cards = [
+    {label:'Kalori', val:Math.round(m.kcal), target:t.kcal, cls:'cal', color:'#e0a030', unit:'kcal'},
+    {label:'Protein', val:Math.round(m.protein), target:t.protein, cls:'pro', color:'#f080b8', unit:'g'},
+    {label:'Karbonhidrat', val:Math.round(m.carb), target:t.carb, cls:'carb', color:'#40d0c0', unit:'g'},
+    {label:'Yağ', val:Math.round(m.fat), target:t.fat, cls:'fat', color:'#9060e0', unit:'g'},
+  ];
+  document.getElementById('macroCards').innerHTML = cards.map(c => {
+    const pct = Math.min(100, Math.round((c.val/c.target)*100));
+    return `<div class="macro-card">
+      <div class="macro-label">${c.label}</div>
+      <div class="macro-val ${c.cls}">${c.val}</div>
+      <div class="macro-target">${c.unit} / ${c.target} hedef</div>
+      <div class="macro-bar"><div class="macro-bar-fill" style="width:${pct}%;background:${c.color}"></div></div>
+    </div>`;
+  }).join('');
+}
+function renderWater() {
+  const w = S.water;
+  document.getElementById('waterCount').textContent = w.drunk;
+  document.getElementById('waterTarget').textContent = w.glasses;
+  const glasses = [];
+  for(let i=0; i<w.glasses; i++) {
+    glasses.push(`<div class="glass ${i<w.drunk?'filled':''}" onclick="toggleGlass(${i})">💧</div>`);
+  }
+  document.getElementById('waterGlasses').innerHTML = glasses.join('');
+}
+function toggleGlass(i) {
+  S.water.drunk = (i < S.water.drunk) ? i : i+1;
+  saveState(); renderWater();
+}
+function renderMeals() {
+  const el = document.getElementById('mealList');
+  el.innerHTML = S.meals.map(meal => {
+    const totKcal = meal.foods.reduce((s,f)=>s+(f.kcal||0),0);
+    const totPro  = meal.foods.reduce((s,f)=>s+(f.protein||0),0);
+    const open = S.mealExpanded[meal.id] ? 'open' : '';
+    const foodRows = meal.foods.map((f,fi)=>`
+      <div class="food-row">
+        <span class="food-name">${f.name}</span>
+        <span class="food-amount">${f.amount}</span>
+        <span class="food-kcal">${f.kcal} kcal</span>
+        <button class="food-del" onclick="deleteFood(${meal.id},${fi})">✕</button>
+      </div>`).join('');
+    return `<div class="meal-card">
+      <div class="meal-head" onclick="toggleMeal(${meal.id})">
+        <div class="meal-icon" style="background:${meal.color}22">${meal.icon}</div>
+        <div class="meal-info">
+          <div class="meal-name">${meal.name}</div>
+          <div class="meal-macro">${Math.round(totPro)}g protein</div>
+        </div>
+        <div class="meal-kcal">${Math.round(totKcal)} kcal</div>
+      </div>
+      <div class="meal-body ${open}" id="meal-body-${meal.id}">
+        <div class="meal-detail">
+          ${foodRows}
+          <div class="add-food-row" style="margin-top:8px;flex-wrap:wrap;gap:5px">
+            <input class="mini-input" style="flex:2;min-width:100px" id="fn-${meal.id}" placeholder="Besin adı">
+            <input class="mini-input" style="width:70px" id="fa-${meal.id}" placeholder="Miktar">
+            <input class="mini-input" style="width:55px" id="fc-${meal.id}" type="number" placeholder="kcal">
+            <input class="mini-input" style="width:45px" id="fp-${meal.id}" type="number" placeholder="pro">
+            <input class="mini-input" style="width:45px" id="fk-${meal.id}" type="number" placeholder="karb">
+            <input class="mini-input" style="width:45px" id="ff-${meal.id}" type="number" placeholder="yağ">
+            <button class="mini-btn" onclick="addFood(${meal.id})">+ Ekle</button>
+          </div>
+          <div class="edit-row" style="margin-top:8px">
+            <button class="mini-btn danger" onclick="deleteMeal(${meal.id})">Öğünü Sil</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleMeal(id) {
+  S.mealExpanded[id] = !S.mealExpanded[id];
+  saveState(); renderMeals();
+}
+function addFood(mealId) {
+  const meal = S.meals.find(m=>m.id===mealId); if(!meal) return;
+  const name = document.getElementById('fn-'+mealId).value.trim(); if(!name) return;
+  meal.foods.push({
+    name,
+    amount: document.getElementById('fa-'+mealId).value || '',
+    kcal: parseFloat(document.getElementById('fc-'+mealId).value)||0,
+    protein: parseFloat(document.getElementById('fp-'+mealId).value)||0,
+    carb: parseFloat(document.getElementById('fk-'+mealId).value)||0,
+    fat: parseFloat(document.getElementById('ff-'+mealId).value)||0,
+  });
+  saveState(); renderMeals(); renderMacroCards();
+}
+function deleteFood(mealId, fi) {
+  const meal = S.meals.find(m=>m.id===mealId);
+  if(meal){ meal.foods.splice(fi,1); saveState(); renderMeals(); renderMacroCards(); }
+}
+function deleteMeal(mealId) {
+  S.meals = S.meals.filter(m=>m.id!==mealId);
+  saveState(); renderMeals(); renderMacroCards();
+}
+function openAddMealModal() {
+  showModal(`<h3>Yeni Öğün</h3>
+    <label>Ad</label><input type="text" id="mnName" placeholder="Kahvaltı, Öğle...">
+    <label>İkon (emoji)</label><input type="text" id="mnIcon" value="🍽️" maxlength="2">
+    <label>Renk (hex)</label><input type="text" id="mnColor" value="#e0a030" placeholder="#e0a030">
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveMeal()">Ekle</button>
+    </div>`);
+}
+function saveMeal() {
+  const name = document.getElementById('mnName').value.trim(); if(!name) return;
+  S.meals.push({id:Date.now(), name,
+    icon: document.getElementById('mnIcon').value || '🍽️',
+    color: document.getElementById('mnColor').value || '#e0a030',
+    foods:[]
+  });
+  saveState(); closeModal(); renderMeals(); renderMacroCards();
+}
+function openMacroTargetModal() {
+  const t = S.macroTargets;
+  showModal(`<h3>Makro Hedefleri</h3>
+    <label>Kalori (kcal)</label><input type="number" id="tKcal" value="${t.kcal}">
+    <label>Protein (g)</label><input type="number" id="tPro" value="${t.protein}">
+    <label>Karbonhidrat (g)</label><input type="number" id="tCarb" value="${t.carb}">
+    <label>Yağ (g)</label><input type="number" id="tFat" value="${t.fat}">
+    <label>Su (bardak)</label><input type="number" id="tWater" value="${S.water.glasses}">
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveMacroTargets()">Kaydet</button>
+    </div>`);
+}
+function saveMacroTargets() {
+  S.macroTargets = {
+    kcal: parseInt(document.getElementById('tKcal').value)||3200,
+    protein: parseInt(document.getElementById('tPro').value)||220,
+    carb: parseInt(document.getElementById('tCarb').value)||350,
+    fat: parseInt(document.getElementById('tFat').value)||90,
+  };
+  S.water.glasses = parseInt(document.getElementById('tWater').value)||8;
+  saveState(); closeModal(); renderMacroCards(); renderWater();
+}
+
+// ── MODAL HELPER ──
+function showModal(html) {
+  document.getElementById('modalInner').innerHTML = html;
+  document.getElementById('modal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+// ── INIT ──
+renderHeader();
+renderWeek();
+renderTimeline();
+renderProgress();
+renderWorkout();
+renderMacroCards();
+renderWater();
+renderMeals();
+</script>
+</body>
+</html>
