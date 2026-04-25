@@ -287,32 +287,9 @@ function todayStr(){const d=new Date();return fmtDate(d);}
 function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseDateStr(s){const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
 
-const defTasks=[
-  {id:1,time:'08:30',title:'GH (Aç Karna)',tags:[{label:'GH 3 IU',color:'purple'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-  {id:2,time:'09:00',title:'Sabah Supplement',tags:[{label:'Probiyota',color:''},{label:'B12',color:'cyan'},{label:'Arimidex 0.5mg',color:'pink'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-  {id:3,time:'09:30',title:'Kahvaltı',tags:[{label:'D3',color:'amber'},{label:'Omega-3',color:'cyan'},{label:'Milk Thistle',color:'green'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-  {id:4,time:'12:30',title:'Öğle',tags:[{label:'Omega-3 (2.doz)',color:'cyan'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-  {id:5,time:'15:30',title:'Pre-Workout',tags:[{label:'Rice Cream',color:'amber'},{label:'Selenyum',color:''}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
-  {id:6,time:'17:00',title:'🏋️ Antrenman',tags:[{label:'Pull 2',color:'pink'}],note:'',highlight:'pink',recurDays:[1,2,3,4,5],doneByDate:{}},
-  {id:7,time:'18:30',title:'Cardio',tags:[{label:'20-25 dk koşu bandı',color:'cyan'}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
-  {id:8,time:'19:00',title:'Post-Workout',tags:[{label:'Whey Protein',color:'green'},{label:'Rice Cream',color:'amber'}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
-  {id:9,time:'20:00',title:'Akşam Yemeği',tags:[{label:'Akşam Yemeği',color:''}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-  {id:10,time:'22:00',title:'Zinc + Ator',tags:[{label:'Zinc — aç karnına',color:'amber'},{label:'Atorvastatin 20mg',color:'cyan'}],note:'',highlight:'red',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
-];
-const defWorkout=[
-  {id:1,name:'Push — Göğüs / Omuz / Tricep',badge:'PUŞ',days:[1],expanded:false,exercises:[{name:'Bench Press',sets:[{label:'4x8',logged:false},{label:'@80kg',logged:false}],note:'Göğüs ortası hissine odaklan'},{name:'Overhead Press',sets:[{label:'3x8',logged:false},{label:'@50kg',logged:false}],note:''},{name:'Incline DB Press',sets:[{label:'3x10',logged:false},{label:'@22kg',logged:false}],note:''},{name:'Lateral Raise',sets:[{label:'4x15',logged:false},{label:'@10kg',logged:false}],note:''},{name:'Tricep Pushdown',sets:[{label:'3x12',logged:false}],note:''}]},
-  {id:2,name:'Pull — Sırt / Bicep',badge:'ÇEKİŞ',days:[2],expanded:false,exercises:[{name:'Deadlift',sets:[{label:'4x5',logged:false},{label:'@120kg',logged:false}],note:''},{name:'Barbell Row',sets:[{label:'4x8',logged:false},{label:'@70kg',logged:false}],note:''},{name:'Pull-Up',sets:[{label:'3x8',logged:false},{label:'BW',logged:false}],note:''},{name:'Bicep Curl',sets:[{label:'3x12',logged:false}],note:''}]},
-  {id:3,name:'Legs — Bacak',badge:'BACAK',days:[3],expanded:false,exercises:[{name:'Squat',sets:[{label:'4x8',logged:false},{label:'@100kg',logged:false}],note:'Derin in'},{name:'Leg Press',sets:[{label:'3x12',logged:false},{label:'@160kg',logged:false}],note:''},{name:'Romanian DL',sets:[{label:'3x10',logged:false},{label:'@70kg',logged:false}],note:''},{name:'Calf Raise',sets:[{label:'4x15',logged:false}],note:''}]},
-  {id:4,name:'Push 2',badge:'PUŞ 2',days:[4],expanded:false,exercises:[{name:'DB Shoulder Press',sets:[{label:'4x10',logged:false},{label:'@24kg',logged:false}],note:''},{name:'Cable Fly',sets:[{label:'3x12',logged:false}],note:''},{name:'Dips',sets:[{label:'3x10',logged:false},{label:'BW',logged:false}],note:''}]},
-  {id:5,name:'Pull 2',badge:'ÇEKİŞ 2',days:[5],expanded:false,exercises:[{name:'Weighted Pull-Up',sets:[{label:'4x6',logged:false},{label:'@10kg',logged:false}],note:''},{name:'Seal Row',sets:[{label:'3x10',logged:false},{label:'@60kg',logged:false}],note:''},{name:'Hammer Curl',sets:[{label:'3x12',logged:false}],note:''}]},
-  {id:6,name:'Yüzme',badge:'YÜZ',days:[0,6],expanded:false,exercises:[{name:'Freestyle',sets:[{label:'10x100m',logged:false}],note:'Tempolu'},{name:'Sırtüstü',sets:[{label:'5x50m',logged:false}],note:''}]},
-];
-const defMeals=[
-  {id:1,name:'Kahvaltı',icon:'🌅',color:'#e0a030',foods:[{name:'Yumurta',amount:'3 adet',kcal:210,protein:18,carb:2,fat:15},{name:'Ekmek',amount:'2 dilim',kcal:160,protein:5,carb:30,fat:2}]},
-  {id:2,name:'Öğle',icon:'☀️',color:'#40d0c0',foods:[{name:'Tavuk Göğsü',amount:'200g',kcal:220,protein:42,carb:0,fat:5},{name:'Pirinç',amount:'150g',kcal:195,protein:4,carb:42,fat:1}]},
-  {id:3,name:'Post-Workout',icon:'💪',color:'#40b870',foods:[{name:'Whey Protein',amount:'1 ölçek',kcal:120,protein:25,carb:5,fat:2},{name:'Rice Cream',amount:'50g',kcal:190,protein:2,carb:43,fat:1}]},
-  {id:4,name:'Akşam',icon:'🌙',color:'#9060e0',foods:[{name:'Kırmızı Et',amount:'200g',kcal:300,protein:40,carb:0,fat:15},{name:'Tatlı Patates',amount:'150g',kcal:130,protein:2,carb:30,fat:0}]},
-];
+const defTasks=[];
+const defWorkout=[];
+const defMeals=[];
 
 let S = {
   tasks: defTasks, selectedDate: todayStr(),
@@ -381,7 +358,7 @@ function renderAll(){
   renderWorkout(); renderMacroCards(); renderWater(); renderMeals();
 }
 
-function switchTab(id){
+window.switchTab=function(id){
   const ids=['gunluk','antrenman','beslenme','aylik'];
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
