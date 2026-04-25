@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPOR — Günlük Takip</title>
+<style>
+:root {
+  --bg:#0d0d0f; --surface:#16161a; --surface2:#1e1e24; --surface3:#26262e;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
+  --text:#f0f0f2; --muted:#8a8a9a;
+  --pink:#e060a0; --pink2:#f080b8; --cyan:#40d0c0;
+  --green:#40b870; --amber:#e0a030; --purple:#9060e0; --red:#e05060;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;}
+.app{max-width:720px;margin:0 auto;padding:18px 12px 60px;}
+.header{margin-bottom:16px;}
+.header h1{font-size:30px;font-weight:900;letter-spacing:-1.5px;background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header .date{font-size:12px;color:var(--muted);margin-top:2px;}
+.tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--surface);border-radius:12px;padding:4px;border:1px solid var(--border);}
+.tab{flex:1;padding:8px 4px;border-radius:9px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;}
+.tab.active{background:var(--surface3);color:var(--text);}
+.panel{display:none;} .panel.active{display:block;}
+.week-nav{display:flex;gap:5px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
+.week-nav::-webkit-scrollbar{height:0;}
+.day-pill{display:flex;flex-direction:column;align-items:center;padding:7px 10px;border-radius:11px;border:1px solid var(--border);background:var(--surface);cursor:pointer;min-width:48px;transition:all .15s;flex-shrink:0;}
+.day-pill:hover{border-color:var(--border2);}
+.day-pill.active{background:var(--pink);border-color:transparent;}
+.day-pill .dn{font-size:10px;font-weight:600;opacity:.7;}
+.day-pill .dd{font-size:18px;font-weight:800;line-height:1.1;}
+.day-pill .dl{font-size:9px;opacity:.6;margin-top:1px;}
+.prog-wrap{background:var(--surface);border-radius:10px;padding:11px 13px;margin-bottom:14px;border:1px solid var(--border);}
+.prog-top{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;}
+.prog-top span{color:var(--muted);} .prog-top strong{color:var(--cyan);}
+.prog-bar{height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--pink),var(--cyan));border-radius:99px;transition:width .4s;}
+.btn{padding:7px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
+.btn:hover{background:var(--surface2);border-color:var(--pink);color:var(--pink);}
+.btn.primary{background:var(--pink);border-color:transparent;color:#fff;}
+.btn.primary:hover{background:var(--pink2);color:#fff;}
+.toolbar{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;}
+.timeline{display:flex;flex-direction:column;gap:7px;}
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;overflow:hidden;transition:border-color .15s;}
+.task-card:hover{border-color:var(--border2);}
+.task-card.done{opacity:.5;}
+.task-card.done .task-title{text-decoration:line-through;}
+.task-head{display:flex;align-items:flex-start;gap:9px;padding:11px 13px 9px;cursor:pointer;}
+.task-time{font-size:11px;color:var(--muted);min-width:36px;margin-top:2px;}
+.task-body{flex:1;}
+.task-title{font-size:13px;font-weight:600;margin-bottom:4px;}
+.task-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.tag{padding:2px 7px;border-radius:20px;font-size:10px;font-weight:500;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted);}
+.tag.pink{background:rgba(224,96,160,.15);border-color:rgba(224,96,160,.3);color:var(--pink2);}
+.tag.cyan{background:rgba(64,208,192,.12);border-color:rgba(64,208,192,.25);color:var(--cyan);}
+.tag.green{background:rgba(64,184,112,.12);border-color:rgba(64,184,112,.25);color:var(--green);}
+.tag.amber{background:rgba(224,160,48,.12);border-color:rgba(224,160,48,.25);color:var(--amber);}
+.tag.purple{background:rgba(144,96,224,.12);border-color:rgba(144,96,224,.25);color:var(--purple);}
+.task-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border2);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .15s;}
+.task-check:hover{border-color:var(--pink);}
+.task-card.done .task-check{background:var(--green);border-color:var(--green);}
+.task-check svg{display:none;} .task-card.done .task-check svg{display:block;}
+.task-expand{max-height:0;overflow:hidden;transition:max-height .3s;}
+.task-expand.open{max-height:500px;}
+.task-detail{padding:10px 13px 13px;border-top:1px solid var(--border);}
+.note-box{background:var(--surface2);border:1px solid var(--border);border-radius:7px;width:100%;min-height:56px;padding:7px 9px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical;outline:none;margin-top:5px;}
+.note-box:focus{border-color:var(--pink);}
+.note-label{font-size:10px;color:var(--muted);}
+.recur-badge{font-size:10px;color:var(--amber);margin-top:3px;}
+.edit-row{display:flex;gap:5px;margin-top:8px;}
+.mini-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--surface3);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;}
+.mini-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+.mini-btn.danger:hover{border-color:var(--red);color:var(--red);}
+.section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:18px 0 9px;padding-left:2px;}
+.wd-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;margin-bottom:10px;overflow:hidden;}
+.wd-card.today-wd{border-color:rgba(224,96,160,.45);}
+.wd-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;}
+.wd-name{font-size:14px;font-weight:700;}
+.wd-badges{display:flex;gap:5px;align-items:center;}
+.wd-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(224,96,160,.15);color:var(--pink2);border:1px solid rgba(224,96,160,.3);}
+.wd-expand{max-height:0;overflow:hidden;transition:max-height .4s;}
+.wd-expand.open{max-height:3000px;}
+.wd-body{padding:0 14px 14px;}
+.ex-item{background:var(--surface2);border-radius:9px;padding:10px 12px;margin-bottom:7px;}
+.ex-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.ex-name-el{font-size:13px;font-weight:600;flex:1;background:transparent;border:none;color:var(--text);font-family:inherit;outline:none;border-bottom:1px solid transparent;}
+.ex-name-el:focus{border-bottom-color:var(--cyan);}
+.ex-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 4px;}
+.ex-del:hover{color:var(--red);}
+.sets-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;}
+.set-chip{display:flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;}
+.set-chip input{background:transparent;border:none;color:var(--text);font-size:11px;font-family:inherit;outline:none;width:68px;}
+.set-chip-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 1px;}
+.set-chip-btn:hover{color:var(--cyan);}
+.set-chip.logged{background:rgba(64,184,112,.15);border-color:rgba(64,184,112,.3);}
+.set-chip.logged input{color:var(--green);}
+.ex-note-el{font-size:11px;color:var(--muted);background:transparent;border:none;border-bottom:1px solid transparent;width:100%;font-family:inherit;outline:none;cursor:text;margin-top:4px;}
+.ex-note-el:focus{border-bottom-color:var(--border2);color:var(--text);}
+.ex-add-set{font-size:10px;padding:3px 8px;border-radius:5px;border:1px dashed var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-top:3px;}
+.ex-add-set:hover{border-color:var(--cyan);color:var(--cyan);}
+.add-ex-row{display:flex;gap:6px;margin-top:10px;}
+.mini-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 9px;color:var(--text);font-size:12px;font-family:inherit;outline:none;width:100%;}
+.mini-input:focus{border-color:var(--cyan);}
+.wd-days-row{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 10px;}
+.wd-day-tag{padding:2px 8px;border-radius:20px;border:1px solid var(--border2);font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;background:transparent;transition:all .12s;user-select:none;}
+.wd-day-tag.on{background:rgba(64,208,192,.15);border-color:rgba(64,208,192,.35);color:var(--cyan);}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cal-nav{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 8px;}
+.cal-nav:hover{color:var(--text);}
+.cal-title{font-size:15px;font-weight:700;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px;}
+.cal-day-name{text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px 0;}
+.cal-cell{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1px solid transparent;transition:all .12s;background:var(--surface);}
+.cal-cell:hover{border-color:var(--border2);}
+.cal-cell.today{border-color:var(--pink);background:rgba(224,96,160,.1);}
+.cal-cell.selected{background:var(--pink)!important;border-color:transparent!important;}
+.cal-cell.selected .cal-num{color:#fff;}
+.cal-cell.other-month{opacity:.25;}
+.cal-cell.empty{background:transparent!important;border-color:transparent!important;cursor:default;}
+.cal-num{font-size:12px;font-weight:600;}
+.cal-dot{width:4px;height:4px;border-radius:50%;margin-top:2px;}
+.cal-cell.has-done .cal-dot{background:var(--green);}
+.cal-cell.has-tasks:not(.has-done) .cal-dot{background:var(--border2);}
+.month-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.mstat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.mstat-val{font-size:22px;font-weight:800;line-height:1;}
+.mstat-label{font-size:10px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.macro-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:14px;}
+.macro-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:10px 8px;text-align:center;}
+.macro-label{font-size:10px;color:var(--muted);margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.macro-val{font-size:20px;font-weight:800;line-height:1;}
+.macro-val.cal{color:var(--amber);} .macro-val.pro{color:var(--pink2);} .macro-val.carb{color:var(--cyan);} .macro-val.fat{color:var(--purple);}
+.macro-target{font-size:9px;color:var(--muted);margin-top:2px;}
+.macro-bar{height:3px;border-radius:99px;background:var(--surface3);margin-top:5px;overflow:hidden;}
+.macro-bar-fill{height:100%;border-radius:99px;transition:width .3s;}
+.water-wrap{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:14px;}
+.water-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.water-top span{font-size:12px;color:var(--muted);}
+.water-count{font-size:18px;font-weight:800;color:var(--cyan);}
+.water-glasses{display:flex;gap:5px;flex-wrap:wrap;}
+.glass{width:30px;height:30px;border-radius:7px;border:2px solid var(--border2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s;}
+.glass.filled{background:rgba(64,208,192,.2);border-color:var(--cyan);}
+.meal-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:7px;}
+.meal-head{display:flex;align-items:center;gap:9px;padding:9px 13px;cursor:pointer;}
+.meal-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.meal-info{flex:1;}
+.meal-name{font-size:13px;font-weight:600;}
+.meal-macro{font-size:10px;color:var(--muted);margin-top:1px;}
+.meal-kcal{font-size:12px;font-weight:700;color:var(--amber);}
+.meal-body{max-height:0;overflow:hidden;transition:max-height .3s;}
+.meal-body.open{max-height:800px;}
+.meal-detail{padding:0 13px 11px;border-top:1px solid var(--border);padding-top:9px;}
+.food-row{display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);}
+.food-row:last-child{border-bottom:none;}
+.food-name{flex:1;font-size:12px;}
+.food-amount{font-size:11px;color:var(--muted);min-width:55px;text-align:right;}
+.food-kcal{font-size:11px;color:var(--amber);min-width:45px;text-align:right;}
+.food-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 3px;}
+.food-del:hover{color:var(--red);}
+.add-food-row{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:100;padding:14px;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:17px;padding:20px;width:100%;max-width:430px;max-height:92vh;overflow-y:auto;}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--pink2);}
+.modal label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;margin-top:11px;}
+.modal input,.modal select,.modal textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;font-family:inherit;outline:none;}
+.modal input:focus,.modal select:focus,.modal textarea:focus{border-color:var(--pink);}
+.modal select option{background:var(--surface);}
+.modal-btns{display:flex;gap:7px;margin-top:14px;justify-content:flex-end;}
+.day-checkboxes{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+.day-cb{padding:4px 9px;border-radius:20px;border:1px solid var(--border2);font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;background:transparent;transition:all .12s;user-select:none;}
+.day-cb.on{background:rgba(64,208,192,.15);border-color:rgba(64,208,192,.35);color:var(--cyan);}
+@media(max-width:480px){
+  .macro-cards{grid-template-columns:repeat(2,1fr);}
+  .tabs .tab{font-size:10px;padding:7px 3px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>SPOR</h1>
+    <div class="date" id="headerDate"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('gunluk')">📋 Günlük</button>
+    <button class="tab" onclick="switchTab('antrenman')">💪 Antrenman</button>
+    <button class="tab" onclick="switchTab('beslenme')">🥗 Beslenme</button>
+    <button class="tab" onclick="switchTab('aylik')">📅 Aylık</button>
+  </div>
+
+  <div class="panel active" id="panel-gunluk">
+    <div class="week-nav" id="weekNav"></div>
+    <div class="prog-wrap">
+      <div class="prog-top"><span id="progLabel">Yükleniyor...</span><strong id="progPct">0%</strong></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAddTaskModal()">+ Görev Ekle</button>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <div class="panel" id="panel-antrenman">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAddWorkoutModal()">+ Program Ekle</button>
+    </div>
+    <div id="workoutList"></div>
+  </div>
+
+  <div class="panel" id="panel-beslenme">
+    <div class="section-head">Günlük Makro</div>
+    <div class="macro-cards" id="macroCards"></div>
+    <div class="water-wrap">
+      <div class="water-top">
+        <span>💧 Su tüketimi</span>
+        <span class="water-count"><span id="waterCount">0</span> / <span id="waterTarget">8</span> bardak</span>
+      </div>
+      <div class="water-glasses" id="waterGlasses"></div>
+    </div>
+    <div class="section-head">Öğünler</div>
+    <div id="mealList"></div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn primary" onclick="openAddMealModal()">+ Öğün Ekle</button>
+      <button class="btn" onclick="openMacroTargetModal()">⚙ Hedefler</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-aylik">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+      <span class="cal-title" id="calTitle"></span>
+      <button class="cal-nav" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="month-stats" id="monthStats"></div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalInner"></div>
+</div>
+
+<script>
+const DAYS_TR=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+const DAYS_FULL=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+const MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+function load(){try{return JSON.parse(localStorage.getItem('spor_v3')||'null');}catch(e){return null;}}
+function save(){localStorage.setItem('spor_v3',JSON.stringify(S));}
+function todayStr(){const d=new Date();return fmtDate(d);}
+function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function parseDateStr(s){const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+
+const defTasks=[
+  {id:1,time:'08:30',title:'GH (Aç Karna)',tags:[{label:'GH 3 IU',color:'purple'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+  {id:2,time:'09:00',title:'Sabah Supplement',tags:[{label:'Probiyota',color:''},{label:'B12',color:'cyan'},{label:'Arimidex 0.5mg',color:'pink'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+  {id:3,time:'09:30',title:'Kahvaltı',tags:[{label:'D3',color:'amber'},{label:'Omega-3',color:'cyan'},{label:'Milk Thistle',color:'green'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+  {id:4,time:'12:30',title:'Öğle',tags:[{label:'Omega-3 (2.doz)',color:'cyan'}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+  {id:5,time:'15:30',title:'Pre-Workout',tags:[{label:'Rice Cream',color:'amber'},{label:'Selenyum',color:''}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
+  {id:6,time:'17:00',title:'🏋️ Antrenman',tags:[{label:'Pull 2',color:'pink'}],note:'',highlight:'pink',recurDays:[1,2,3,4,5],doneByDate:{}},
+  {id:7,time:'18:30',title:'Cardio',tags:[{label:'20-25 dk koşu bandı',color:'cyan'}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
+  {id:8,time:'19:00',title:'Post-Workout',tags:[{label:'Whey Protein',color:'green'},{label:'Rice Cream',color:'amber'}],note:'',highlight:'',recurDays:[1,2,3,4,5],doneByDate:{}},
+  {id:9,time:'20:00',title:'Akşam Yemeği',tags:[{label:'Akşam Yemeği',color:''}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+  {id:10,time:'22:00',title:'Zinc + Ator',tags:[{label:'Zinc — aç karnına',color:'amber'},{label:'Atorvastatin 20mg',color:'cyan'}],note:'',highlight:'red',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
+];
+
+const defWorkout=[
+  {id:1,name:'Push — Göğüs / Omuz / Tricep',badge:'PUŞ',days:[1],expanded:false,exercises:[
+    {name:'Bench Press',sets:[{label:'4x8',logged:false},{label:'@80kg',logged:false}],note:'Göğüs ortası hissine odaklan'},
+    {name:'Overhead Press',sets:[{label:'3x8',logged:false},{label:'@50kg',logged:false}],note:''},
+    {name:'Incline DB Press',sets:[{label:'3x10',logged:false},{label:'@22kg',logged:false}],note:''},
+    {name:'Lateral Raise',sets:[{label:'4x15',logged:false},{label:'@10kg',logged:false}],note:''},
+    {name:'Tricep Pushdown',sets:[{label:'3x12',logged:false}],note:''},
+  ]},
+  {id:2,name:'Pull — Sırt / Bicep',badge:'ÇEKİŞ',days:[2],expanded:false,exercises:[
+    {name:'Deadlift',sets:[{label:'4x5',logged:false},{label:'@120kg',logged:false}],note:''},
+    {name:'Barbell Row',sets:[{label:'4x8',logged:false},{label:'@70kg',logged:false}],note:''},
+    {name:'Pull-Up',sets:[{label:'3x8',logged:false},{label:'BW',logged:false}],note:''},
+    {name:'Bicep Curl',sets:[{label:'3x12',logged:false}],note:''},
+  ]},
+  {id:3,name:'Legs — Bacak',badge:'BACAK',days:[3],expanded:false,exercises:[
+    {name:'Squat',sets:[{label:'4x8',logged:false},{label:'@100kg',logged:false}],note:'Derin in'},
+    {name:'Leg Press',sets:[{label:'3x12',logged:false},{label:'@160kg',logged:false}],note:''},
+    {name:'Romanian DL',sets:[{label:'3x10',logged:false},{label:'@70kg',logged:false}],note:''},
+    {name:'Calf Raise',sets:[{label:'4x15',logged:false}],note:''},
+  ]},
+  {id:4,name:'Push 2',badge:'PUŞ 2',days:[4],expanded:false,exercises:[
+    {name:'DB Shoulder Press',sets:[{label:'4x10',logged:false},{label:'@24kg',logged:false}],note:''},
+    {name:'Cable Fly',sets:[{label:'3x12',logged:false}],note:''},
+    {name:'Dips',sets:[{label:'3x10',logged:false},{label:'BW',logged:false}],note:''},
+  ]},
+  {id:5,name:'Pull 2',badge:'ÇEKİŞ 2',days:[5],expanded:false,exercises:[
+    {name:'Weighted Pull-Up',sets:[{label:'4x6',logged:false},{label:'@10kg',logged:false}],note:''},
+    {name:'Seal Row',sets:[{label:'3x10',logged:false},{label:'@60kg',logged:false}],note:''},
+    {name:'Hammer Curl',sets:[{label:'3x12',logged:false}],note:''},
+  ]},
+  {id:6,name:'Yüzme',badge:'YÜZ',days:[0,6],expanded:false,exercises:[
+    {name:'Freestyle',sets:[{label:'10x100m',logged:false}],note:'Tempolu'},
+    {name:'Sırtüstü',sets:[{label:'5x50m',logged:false}],note:''},
+  ]},
+];
+
+const defMeals=[
+  {id:1,name:'Kahvaltı',icon:'🌅',color:'#e0a030',foods:[
+    {name:'Yumurta',amount:'3 adet',kcal:210,protein:18,carb:2,fat:15},
+    {name:'Ekmek',amount:'2 dilim',kcal:160,protein:5,carb:30,fat:2},
+  ]},
+  {id:2,name:'Öğle',icon:'☀️',color:'#40d0c0',foods:[
+    {name:'Tavuk Göğsü',amount:'200g',kcal:220,protein:42,carb:0,fat:5},
+    {name:'Pirinç',amount:'150g',kcal:195,protein:4,carb:42,fat:1},
+  ]},
+  {id:3,name:'Post-Workout',icon:'💪',color:'#40b870',foods:[
+    {name:'Whey Protein',amount:'1 ölçek',kcal:120,protein:25,carb:5,fat:2},
+    {name:'Rice Cream',amount:'50g',kcal:190,protein:2,carb:43,fat:1},
+  ]},
+  {id:4,name:'Akşam',icon:'🌙',color:'#9060e0',foods:[
+    {name:'Kırmızı Et',amount:'200g',kcal:300,protein:40,carb:0,fat:15},
+    {name:'Tatlı Patates',amount:'150g',kcal:130,protein:2,carb:30,fat:0},
+  ]},
+];
+
+let saved=load();
+let S=saved||{tasks:defTasks,selectedDate:todayStr(),workout:defWorkout,meals:defMeals,macroTargets:{kcal:3200,protein:220,carb:350,fat:90},water:{glasses:8,drunk:0},mealExpanded:{},calMonth:new Date().getMonth(),calYear:new Date().getFullYear()};
+if(!S.workout) S.workout=defWorkout;
+if(!S.meals) S.meals=defMeals;
+if(!S.water) S.water={glasses:8,drunk:0};
+if(!S.mealExpanded) S.mealExpanded={};
+if(S.calMonth===undefined){S.calMonth=new Date().getMonth();S.calYear=new Date().getFullYear();}
+S.tasks.forEach(t=>{if(!t.doneByDate)t.doneByDate={};if(t.recurDays===undefined)t.recurDays=[0,1,2,3,4,5,6];});
+
+function switchTab(id){
+  const ids=['gunluk','antrenman','beslenme','aylik'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='aylik') renderCalendar();
+}
+
+function renderHeader(){
+  const d=parseDateStr(S.selectedDate);
+  document.getElementById('headerDate').textContent=`${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${d.getFullYear()} — ${DAYS_FULL[d.getDay()]}`;
+}
+
+function getWeekDays(){const today=new Date();const arr=[];for(let i=-2;i<=4;i++){const d=new Date(today);d.setDate(today.getDate()+i);arr.push(d);}return arr;}
+
+function renderWeek(){
+  const nav=document.getElementById('weekNav');
+  const today=todayStr();
+  nav.innerHTML=getWeekDays().map(d=>{
+    const ds=fmtDate(d);
+    const active=ds===S.selectedDate?'active':'';
+    const lbl=ds===today?'Bugün':'';
+    return `<div class="day-pill ${active}" onclick="selectDay('${ds}')">
+      <span class="dn">${DAYS_TR[d.getDay()]}</span>
+      <span class="dd">${d.getDate()}</span>
+      <span class="dl">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+function selectDay(ds){S.selectedDate=ds;save();renderWeek();renderHeader();renderTimeline();renderProgress();}
+
+function getTasksForDate(ds){const d=parseDateStr(ds);const dayIdx=d.getDay();return S.tasks.filter(t=>t.recurDays.includes(dayIdx));}
+function isTaskDone(task,ds){return!!task.doneByDate[ds];}
+
+function renderProgress(){
+  const tasks=getTasksForDate(S.selectedDate);
+  const total=tasks.length,done=tasks.filter(t=>isTaskDone(t,S.selectedDate)).length;
+  const pct=total?Math.round((done/total)*100):0;
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progLabel').textContent=`${done} / ${total} tamamlandı`;
+}
+
+function renderTimeline(){
+  const el=document.getElementById('timeline');
+  const ds=S.selectedDate;
+  const tasks=getTasksForDate(ds).sort((a,b)=>a.time.localeCompare(b.time));
+  if(!tasks.length){el.innerHTML=`<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">Bu gün için görev yok</div>`;return;}
+  el.innerHTML=tasks.map(task=>{
+    const done=isTaskDone(task,ds);
+    const bc=task.highlight==='pink'?'rgba(224,96,160,.5)':task.highlight==='red'?'rgba(224,80,96,.5)':'';
+    const bs=bc?`border-color:${bc};`:'';
+    const tags=task.tags.map(t=>`<span class="tag ${t.color||''}">${t.label}</span>`).join('');
+    const noteInd=task.note?' 📝':'';
+    const recurLabel=task.recurDays.length===7?'Her gün':task.recurDays.length===5&&!task.recurDays.includes(0)&&!task.recurDays.includes(6)?'Hafta içi':task.recurDays.map(i=>DAYS_TR[i]).join(', ');
+    return `<div class="task-card ${done?'done':''}" style="${bs}">
+      <div class="task-head" onclick="toggleExpand(${task.id})">
+        <div class="task-time">${task.time}</div>
+        <div class="task-body">
+          <div class="task-title">${task.title}${noteInd}</div>
+          <div class="task-tags">${tags}</div>
+          <div class="recur-badge">🔁 ${recurLabel}</div>
+        </div>
+        <div class="task-check" onclick="event.stopPropagation();toggleDone(${task.id})">
+          <svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </div>
+      </div>
+      <div class="task-expand" id="expand-${task.id}">
+        <div class="task-detail">
+          <div class="note-label">Not</div>
+          <textarea class="note-box" rows="2" placeholder="Not ekle..." onchange="saveNote(${task.id},this.value)">${task.note||''}</textarea>
+          <div class="edit-row">
+            <button class="mini-btn" onclick="openEditTaskModal(${task.id})">Düzenle</button>
+            <button class="mini-btn danger" onclick="deleteTask(${task.id})">Sil</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(id){document.getElementById('expand-'+id).classList.toggle('open');}
+function toggleDone(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;const ds=S.selectedDate;t.doneByDate[ds]=!t.doneByDate[ds];save();renderTimeline();renderProgress();}
+function saveNote(id,val){const t=S.tasks.find(x=>x.id===id);if(t){t.note=val;save();}}
+function deleteTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);save();renderTimeline();renderProgress();}
+
+let _taskMode='add',_editTaskId=null;
+function openAddTaskModal(){
+  _taskMode='add';_editTaskId=null;
+  const d=parseDateStr(S.selectedDate);const defaultDay=d.getDay();
+  showModal(taskModalHTML(null,defaultDay));
+}
+function openEditTaskModal(id){
+  _taskMode='edit';_editTaskId=id;
+  const t=S.tasks.find(x=>x.id===id);
+  showModal(taskModalHTML(t,null));
+}
+function taskModalHTML(t,defaultDay){
+  const recurDays=t?t.recurDays:(defaultDay!==null?[defaultDay]:[0,1,2,3,4,5,6]);
+  const dayBtns=DAYS_TR.map((d,i)=>`<span class="day-cb ${recurDays.includes(i)?'on':''}" onclick="this.classList.toggle('on')" data-day="${i}">${d}</span>`).join('');
+  return `<h3>${t?'Görevi Düzenle':'Yeni Görev'}</h3>
+    <label>Saat</label><input type="time" id="mTime" value="${t?t.time:'08:00'}">
+    <label>Başlık</label><input type="text" id="mTitle" value="${t?t.title:''}" placeholder="örn: Sabah kahvaltı">
+    <label>Etiketler (virgülle ayır)</label><input type="text" id="mTags" value="${t?t.tags.map(x=>x.label).join(', '):''}" placeholder="örn: Protein, D3">
+    <label>Renk</label><select id="mColor">
+      <option value="">Varsayılan</option>
+      <option value="pink" ${t&&t.tags[0]?.color==='pink'?'selected':''}>Pembe</option>
+      <option value="cyan" ${t&&t.tags[0]?.color==='cyan'?'selected':''}>Turkuaz</option>
+      <option value="green" ${t&&t.tags[0]?.color==='green'?'selected':''}>Yeşil</option>
+      <option value="amber" ${t&&t.tags[0]?.color==='amber'?'selected':''}>Amber</option>
+      <option value="purple" ${t&&t.tags[0]?.color==='purple'?'selected':''}>Mor</option>
+    </select>
+    <label>Hangi günler tekrarlansın?</label>
+    <div class="day-checkboxes" id="dayCbs">${dayBtns}</div>
+    <label>Not</label><textarea id="mNote" rows="2">${t?t.note||'':''}</textarea>
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveTaskModal()">Kaydet</button>
+    </div>`;
+}
+function saveTaskModal(){
+  const time=document.getElementById('mTime').value;
+  const title=document.getElementById('mTitle').value.trim();if(!title)return;
+  const tagsRaw=document.getElementById('mTags').value;
+  const color=document.getElementById('mColor').value;
+  const note=document.getElementById('mNote').value;
+  const recurDays=[...document.querySelectorAll('#dayCbs .day-cb.on')].map(el=>+el.dataset.day);
+  const tags=tagsRaw.split(',').map(s=>s.trim()).filter(Boolean).map(label=>({label,color}));
+  if(_taskMode==='add'){
+    S.tasks.push({id:Date.now(),time,title,tags,note,highlight:'',recurDays,doneByDate:{}});
+  } else {
+    const t=S.tasks.find(x=>x.id===_editTaskId);
+    if(t){t.time=time;t.title=title;t.tags=tags;t.note=note;t.recurDays=recurDays;}
+  }
+  save();closeModal();renderTimeline();renderProgress();renderWeek();
+}
+
+function renderWorkout(){
+  const el=document.getElementById('workoutList');
+  const todayDay=new Date().getDay();
+  el.innerHTML=S.workout.map((w,wi)=>{
+    const isToday=w.days.includes(todayDay);
+    const dayTags=DAYS_TR.map((d,i)=>`<span class="wd-day-tag ${w.days.includes(i)?'on':''}" onclick="toggleWDDay(${wi},${i})">${d}</span>`).join('');
+    const exHTML=w.exercises.map((ex,ei)=>{
+      const setsHTML=ex.sets.map((s,si)=>`
+        <span class="set-chip ${s.logged?'logged':''}">
+          <input value="${s.label}" onchange="updateSetLabel(${wi},${ei},${si},this.value)">
+          <button class="set-chip-btn" onclick="toggleSetLog(${wi},${ei},${si})" title="Tamamlandı/Geri al">${s.logged?'✓':'○'}</button>
+          <button class="set-chip-btn" onclick="deleteSet(${wi},${ei},${si})" title="Sil">✕</button>
+        </span>`).join('');
+      return `<div class="ex-item">
+        <div class="ex-top">
+          <input class="ex-name-el" value="${ex.name}" onchange="updateExName(${wi},${ei},this.value)" placeholder="Egzersiz adı">
+          <button class="ex-del" onclick="deleteExercise(${wi},${ei})">✕</button>
+        </div>
+        <div class="sets-wrap">${setsHTML}</div>
+        <button class="ex-add-set" onclick="addSet(${wi},${ei})">+ Set ekle</button>
+        <input class="ex-note-el" value="${ex.note||''}" onchange="updateExNote(${wi},${ei},this.value)" placeholder="Not...">
+      </div>`;
+    }).join('');
+    return `<div class="wd-card ${isToday?'today-wd':''}">
+      <div class="wd-head" onclick="toggleWD(${wi})">
+        <span class="wd-name">${w.name}</span>
+        <div class="wd-badges">
+          <span class="wd-badge">${w.badge}</span>
+          <span style="font-size:11px;color:var(--muted)">${w.expanded?'▲':'▼'}</span>
+        </div>
+      </div>
+      <div class="wd-expand ${w.expanded?'open':''}" id="wd-exp-${wi}">
+        <div style="padding:4px 14px 4px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;">Günler</div>
+        <div class="wd-days-row">${dayTags}</div>
+        <div class="wd-body">
+          ${exHTML}
+          <div class="add-ex-row">
+            <input class="mini-input" id="newEx-${wi}" placeholder="Yeni egzersiz adı...">
+            <button class="mini-btn" onclick="addExercise(${wi})">+ Ekle</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <button class="mini-btn" onclick="openEditWDModal(${wi})">Adı Düzenle</button>
+            <button class="mini-btn danger" onclick="deleteWorkout(${wi})">Programı Sil</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleWD(wi){S.workout[wi].expanded=!S.workout[wi].expanded;save();renderWorkout();}
+function toggleWDDay(wi,day){const w=S.workout[wi];const idx=w.days.indexOf(day);if(idx>=0)w.days.splice(idx,1);else w.days.push(day);save();renderWorkout();}
+function updateExName(wi,ei,val){S.workout[wi].exercises[ei].name=val;save();}
+function updateExNote(wi,ei,val){S.workout[wi].exercises[ei].note=val;save();}
+function updateSetLabel(wi,ei,si,val){S.workout[wi].exercises[ei].sets[si].label=val;save();}
+function toggleSetLog(wi,ei,si){S.workout[wi].exercises[ei].sets[si].logged=!S.workout[wi].exercises[ei].sets[si].logged;save();renderWorkout();}
+function deleteSet(wi,ei,si){S.workout[wi].exercises[ei].sets.splice(si,1);save();renderWorkout();}
+function addSet(wi,ei){S.workout[wi].exercises[ei].sets.push({label:'3x10',logged:false});save();renderWorkout();}
+function deleteExercise(wi,ei){S.workout[wi].exercises.splice(ei,1);save();renderWorkout();}
+function addExercise(wi){const inp=document.getElementById('newEx-'+wi);const name=inp.value.trim();if(!name)return;S.workout[wi].exercises.push({name,sets:[{label:'3x10',logged:false}],note:''});inp.value='';save();renderWorkout();}
+function deleteWorkout(wi){if(!confirm('Bu programı silmek istediğine emin misin?'))return;S.workout.splice(wi,1);save();renderWorkout();}
+
+function openAddWorkoutModal(){
+  showModal(`<h3>Yeni Antrenman Programı</h3>
+    <label>Program Adı</label><input type="text" id="wName" placeholder="örn: Push — Göğüs / Omuz">
+    <label>Kısa Etiket</label><input type="text" id="wBadge" placeholder="örn: PUŞ">
+    <label>Günler</label>
+    <div class="day-checkboxes" id="wDayCbs">${DAYS_TR.map((d,i)=>`<span class="day-cb" onclick="this.classList.toggle('on')" data-day="${i}">${d}</span>`).join('')}</div>
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveNewWorkout()">Ekle</button>
+    </div>`);
+}
+function openEditWDModal(wi){
+  const w=S.workout[wi];
+  showModal(`<h3>Program Adını Düzenle</h3>
+    <label>Program Adı</label><input type="text" id="wNameE" value="${w.name}">
+    <label>Kısa Etiket</label><input type="text" id="wBadgeE" value="${w.badge}">
+    <div class="modal-btns">
+      <button class="mini-btn" onclick="closeModal()">İptal</button>
+      <button class="btn primary" onclick="saveEditWD(${wi})">Kaydet</button>
+    </div>`);
+}
+function saveEditWD(wi){S.workout[wi].name=document.getElementById('wNameE').value.trim()||S.workout[wi].name;S.workout[wi].badge=document.getElementById('wBadgeE').value.trim()||S.workout[wi].badge;save();closeModal();renderWorkout();}
+function saveNewWorkout(){
+  const name=document.getElementById('wName').value.trim();if(!name)return;
+  const badge=document.getElementById('wBadge').value.trim()||name.slice(0,4).toUpperCase();
+  const days=[...document.querySelectorAll('#wDayCbs .day-cb.on')].map(el=>+el.dataset.day);
+  S.workout.push({id:Date.now(),name,badge,days,expanded:true,exercises:[]});
+  save();closeModal();renderWorkout();
+}
+
+function renderCalendar(){
+  const yr=S.calYear,mo=S.calMonth;
+  document.getElementById('calTitle').textContent=`${MONTHS_TR[mo]} ${yr}`;
+  const firstDay=new Date(yr,mo,1).getDay();
+  const daysInMonth=new Date(yr,mo+1,0).getDate();
+  const today=todayStr();
+  let totalTasks=0,doneDays=0,totalDone=0;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayIdx=new Date(yr,mo,d).getDay();
+    const tasks=S.tasks.filter(t=>t.recurDays.includes(dayIdx));
+    const done=tasks.filter(t=>t.doneByDate[ds]).length;
+    totalTasks+=tasks.length;totalDone+=done;
+    if(tasks.length>0&&done===tasks.length)doneDays++;
+  }
+  document.getElementById('monthStats').innerHTML=`
+    <div class="mstat"><div class="mstat-val" style="color:var(--cyan)">${doneDays}</div><div class="mstat-label">Tam gün</div></div>
+    <div class="mstat"><div class="mstat-val" style="color:var(--green)">${totalDone}</div><div class="mstat-label">Görev yapıldı</div></div>
+    <div class="mstat"><div class="mstat-val" style="color:var(--pink)">${totalTasks?Math.round((totalDone/totalTasks)*100):0}%</div><div class="mstat-label">Başarı oranı</div></div>`;
+  let html=DAYS_TR.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++) html+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayIdx=new Date(yr,mo,d).getDay();
+    const tasks=S.tasks.filter(t=>t.recurDays.includes(dayIdx));
+    const done=tasks.filter(t=>t.doneByDate[ds]).length;
+    let cls='cal-cell';
+    if(ds===today)cls+=' today';
+    if(ds===S.selectedDate)cls+=' selected';
+    if(done>0)cls+=' has-done';
+    else if(tasks.length>0)cls+=' has-tasks';
+    html+=`<div class="${cls}" onclick="calSelectDay('${ds}')"><span class="cal-num">${d}</span><span class="cal-dot"></span></div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+function changeMonth(dir){
+  S.calMonth+=dir;
+  if(S.calMonth>11){S.calMonth=0;S.calYear++;}
+  if(S.calMonth<0){S.calMonth=11;S.calYear--;}
+  save();renderCalendar();
+}
+function calSelectDay(ds){S.selectedDate=ds;save();renderCalendar();renderWeek();renderHeader();renderTimeline();renderProgress();}
+
+function calcMacros(){let kcal=0,protein=0,carb=0,fat=0;S.meals.forEach(m=>m.foods.forEach(f=>{kcal+=f.kcal||0;protein+=f.protein||0;carb+=f.carb||0;fat+=f.fat||0;}));return{kcal,protein,carb,fat};}
+function renderMacroCards(){
+  const m=calcMacros();const t=S.macroTargets;
+  const cards=[{label:'Kalori',val:Math.round(m.kcal),target:t.kcal,cls:'cal',color:'#e0a030',unit:'kcal'},{label:'Protein',val:Math.round(m.protein),target:t.protein,cls:'pro',color:'#f080b8',unit:'g'},{label:'Karbonhidrat',val:Math.round(m.carb),target:t.carb,cls:'carb',color:'#40d0c0',unit:'g'},{label:'Yağ',val:Math.round(m.fat),target:t.fat,cls:'fat',color:'#9060e0',unit:'g'}];
+  document.getElementById('macroCards').innerHTML=cards.map(c=>{const pct=Math.min(100,Math.round((c.val/c.target)*100));return `<div class="macro-card"><div class="macro-label">${c.label}</div><div class="macro-val ${c.cls}">${c.val}</div><div class="macro-target">${c.unit} / ${c.target} hedef</div><div class="macro-bar"><div class="macro-bar-fill" style="width:${pct}%;background:${c.color}"></div></div></div>`;}).join('');
+}
+function renderWater(){
+  const w=S.water;
+  document.getElementById('waterCount').textContent=w.drunk;
+  document.getElementById('waterTarget').textContent=w.glasses;
+  let html='';for(let i=0;i<w.glasses;i++)html+=`<div class="glass ${i<w.drunk?'filled':''}" onclick="toggleGlass(${i})">💧</div>`;
+  document.getElementById('waterGlasses').innerHTML=html;
+}
+function toggleGlass(i){S.water.drunk=(i<S.water.drunk)?i:i+1;save();renderWater();}
+function renderMeals(){
+  document.getElementById('mealList').innerHTML=S.meals.map(meal=>{
+    const totKcal=meal.foods.reduce((s,f)=>s+(f.kcal||0),0);
+    const totPro=meal.foods.reduce((s,f)=>s+(f.protein||0),0);
+    const open=S.mealExpanded[meal.id]?'open':'';
+    const foodRows=meal.foods.map((f,fi)=>`<div class="food-row"><span class="food-name">${f.name}</span><span class="food-amount">${f.amount}</span><span class="food-kcal">${f.kcal} kcal</span><button class="food-del" onclick="deleteFood(${meal.id},${fi})">✕</button></div>`).join('');
+    return `<div class="meal-card">
+      <div class="meal-head" onclick="toggleMeal(${meal.id})">
+        <div class="meal-icon" style="background:${meal.color}22">${meal.icon}</div>
+        <div class="meal-info"><div class="meal-name">${meal.name}</div><div class="meal-macro">${Math.round(totPro)}g protein</div></div>
+        <div class="meal-kcal">${Math.round(totKcal)} kcal</div>
+      </div>
+      <div class="meal-body ${open}">
+        <div class="meal-detail">
+          ${foodRows}
+          <div class="add-food-row">
+            <input class="mini-input" style="flex:2;min-width:90px" id="fn-${meal.id}" placeholder="Besin adı">
+            <input class="mini-input" style="width:60px" id="fa-${meal.id}" placeholder="Miktar">
+            <input class="mini-input" style="width:48px" id="fc-${meal.id}" type="number" placeholder="kcal">
+            <input class="mini-input" style="width:38px" id="fp-${meal.id}" type="number" placeholder="pro">
+            <input class="mini-input" style="width:38px" id="fk-${meal.id}" type="number" placeholder="k">
+            <input class="mini-input" style="width:38px" id="ff-${meal.id}" type="number" placeholder="yağ">
+            <button class="mini-btn" onclick="addFood(${meal.id})">+</button>
+          </div>
+          <div class="edit-row" style="margin-top:7px"><button class="mini-btn danger" onclick="deleteMeal(${meal.id})">Öğünü Sil</button></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleMeal(id){S.mealExpanded[id]=!S.mealExpanded[id];save();renderMeals();}
+function addFood(mealId){const meal=S.meals.find(m=>m.id===mealId);if(!meal)return;const name=document.getElementById('fn-'+mealId).value.trim();if(!name)return;meal.foods.push({name,amount:document.getElementById('fa-'+mealId).value||'',kcal:parseFloat(document.getElementById('fc-'+mealId).value)||0,protein:parseFloat(document.getElementById('fp-'+mealId).value)||0,carb:parseFloat(document.getElementById('fk-'+mealId).value)||0,fat:parseFloat(document.getElementById('ff-'+mealId).value)||0});save();renderMeals();renderMacroCards();}
+function deleteFood(mealId,fi){const meal=S.meals.find(m=>m.id===mealId);if(meal){meal.foods.splice(fi,1);save();renderMeals();renderMacroCards();}}
+function deleteMeal(mealId){S.meals=S.meals.filter(m=>m.id!==mealId);save();renderMeals();renderMacroCards();}
+function openAddMealModal(){showModal(`<h3>Yeni Öğün</h3><label>Ad</label><input type="text" id="mnName" placeholder="Kahvaltı, Öğle..."><label>İkon (emoji)</label><input type="text" id="mnIcon" value="🍽️" maxlength="2"><label>Renk (hex)</label><input type="text" id="mnColor" value="#e0a030"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMeal()">Ekle</button></div>`);}
+function saveMeal(){const name=document.getElementById('mnName').value.trim();if(!name)return;S.meals.push({id:Date.now(),name,icon:document.getElementById('mnIcon').value||'🍽️',color:document.getElementById('mnColor').value||'#e0a030',foods:[]});save();closeModal();renderMeals();renderMacroCards();}
+function openMacroTargetModal(){const t=S.macroTargets;showModal(`<h3>Makro Hedefleri</h3><label>Kalori (kcal)</label><input type="number" id="tKcal" value="${t.kcal}"><label>Protein (g)</label><input type="number" id="tPro" value="${t.protein}"><label>Karbonhidrat (g)</label><input type="number" id="tCarb" value="${t.carb}"><label>Yağ (g)</label><input type="number" id="tFat" value="${t.fat}"><label>Su (bardak)</label><input type="number" id="tWater" value="${S.water.glasses}"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMacroTargets()">Kaydet</button></div>`);}
+function saveMacroTargets(){S.macroTargets={kcal:parseInt(document.getElementById('tKcal').value)||3200,protein:parseInt(document.getElementById('tPro').value)||220,carb:parseInt(document.getElementById('tCarb').value)||350,fat:parseInt(document.getElementById('tFat').value)||90};S.water.glasses=parseInt(document.getElementById('tWater').value)||8;save();closeModal();renderMacroCards();renderWater();}
+
+function showModal(html){document.getElementById('modalInner').innerHTML=html;document.getElementById('modal').style.display='flex';}
+function closeModal(){document.getElementById('modal').style.display='none';}
+
+renderHeader();renderWeek();renderTimeline();renderProgress();renderWorkout();renderMacroCards();renderWater();renderMeals();
+</script>
+</body>
+</html>
