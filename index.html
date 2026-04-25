@@ -15,9 +15,14 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;}
 .app{max-width:720px;margin:0 auto;padding:18px 12px 60px;}
-.header{margin-bottom:16px;}
+.header{margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;}
 .header h1{font-size:30px;font-weight:900;letter-spacing:-1.5px;background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .header .date{font-size:12px;color:var(--muted);margin-top:2px;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-top:6px;flex-shrink:0;transition:background .3s;}
+.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite;}
+.sync-dot.synced{background:var(--green);}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--surface);border-radius:12px;padding:4px;border:1px solid var(--border);}
 .tab{flex:1;padding:8px 4px;border-radius:9px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;}
 .tab.active{background:var(--surface3);color:var(--text);}
@@ -115,7 +120,6 @@ html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-u
 .cal-cell.today{border-color:var(--pink);background:rgba(224,96,160,.1);}
 .cal-cell.selected{background:var(--pink)!important;border-color:transparent!important;}
 .cal-cell.selected .cal-num{color:#fff;}
-.cal-cell.other-month{opacity:.25;}
 .cal-cell.empty{background:transparent!important;border-color:transparent!important;cursor:default;}
 .cal-num{font-size:12px;font-weight:600;}
 .cal-dot{width:4px;height:4px;border-radius:50%;margin-top:2px;}
@@ -169,6 +173,11 @@ html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-u
 .day-checkboxes{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
 .day-cb{padding:4px 9px;border-radius:20px;border:1px solid var(--border2);font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;background:transparent;transition:all .12s;user-select:none;}
 .day-cb.on{background:rgba(64,208,192,.15);border-color:rgba(64,208,192,.35);color:var(--cyan);}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px;}
+.loading-screen h2{font-size:24px;font-weight:900;background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.loading-screen p{font-size:13px;color:var(--muted);}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--pink);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 @media(max-width:480px){
   .macro-cards{grid-template-columns:repeat(2,1fr);}
   .tabs .tab{font-size:10px;padding:7px 3px;}
@@ -176,11 +185,22 @@ html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-u
 </style>
 </head>
 <body>
-<div class="app">
+
+<div class="loading-screen" id="loadingScreen">
+  <h2>SPOR</h2>
+  <div class="spinner"></div>
+  <p>Veriler yükleniyor...</p>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
   <div class="header">
-    <h1>SPOR</h1>
-    <div class="date" id="headerDate"></div>
+    <div>
+      <h1>SPOR</h1>
+      <div class="date" id="headerDate"></div>
+    </div>
+    <div class="sync-dot" id="syncDot" title="Senkronizasyon durumu"></div>
   </div>
+
   <div class="tabs">
     <button class="tab active" onclick="switchTab('gunluk')">📋 Günlük</button>
     <button class="tab" onclick="switchTab('antrenman')">💪 Antrenman</button>
@@ -240,13 +260,29 @@ html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-u
   <div class="modal" id="modalInner"></div>
 </div>
 
-<script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAxJQDg7wkPFb62UR2-MAdrZfpl7rxTBlY",
+  authDomain: "spor-takip-5fa26.firebaseapp.com",
+  projectId: "spor-takip-5fa26",
+  storageBucket: "spor-takip-5fa26.firebasestorage.app",
+  messagingSenderId: "110830641384",
+  appId: "1:110830641384:web:f21896eb97e6f83bcbe95d",
+  measurementId: "G-1XFCT5LS6G"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const DOC = doc(db, "spor", "main");
+
 const DAYS_TR=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
 const DAYS_FULL=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
-function load(){try{return JSON.parse(localStorage.getItem('spor_v3')||'null');}catch(e){return null;}}
-function save(){localStorage.setItem('spor_v3',JSON.stringify(S));}
 function todayStr(){const d=new Date();return fmtDate(d);}
 function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseDateStr(s){const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
@@ -263,70 +299,87 @@ const defTasks=[
   {id:9,time:'20:00',title:'Akşam Yemeği',tags:[{label:'Akşam Yemeği',color:''}],note:'',highlight:'',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
   {id:10,time:'22:00',title:'Zinc + Ator',tags:[{label:'Zinc — aç karnına',color:'amber'},{label:'Atorvastatin 20mg',color:'cyan'}],note:'',highlight:'red',recurDays:[0,1,2,3,4,5,6],doneByDate:{}},
 ];
-
 const defWorkout=[
-  {id:1,name:'Push — Göğüs / Omuz / Tricep',badge:'PUŞ',days:[1],expanded:false,exercises:[
-    {name:'Bench Press',sets:[{label:'4x8',logged:false},{label:'@80kg',logged:false}],note:'Göğüs ortası hissine odaklan'},
-    {name:'Overhead Press',sets:[{label:'3x8',logged:false},{label:'@50kg',logged:false}],note:''},
-    {name:'Incline DB Press',sets:[{label:'3x10',logged:false},{label:'@22kg',logged:false}],note:''},
-    {name:'Lateral Raise',sets:[{label:'4x15',logged:false},{label:'@10kg',logged:false}],note:''},
-    {name:'Tricep Pushdown',sets:[{label:'3x12',logged:false}],note:''},
-  ]},
-  {id:2,name:'Pull — Sırt / Bicep',badge:'ÇEKİŞ',days:[2],expanded:false,exercises:[
-    {name:'Deadlift',sets:[{label:'4x5',logged:false},{label:'@120kg',logged:false}],note:''},
-    {name:'Barbell Row',sets:[{label:'4x8',logged:false},{label:'@70kg',logged:false}],note:''},
-    {name:'Pull-Up',sets:[{label:'3x8',logged:false},{label:'BW',logged:false}],note:''},
-    {name:'Bicep Curl',sets:[{label:'3x12',logged:false}],note:''},
-  ]},
-  {id:3,name:'Legs — Bacak',badge:'BACAK',days:[3],expanded:false,exercises:[
-    {name:'Squat',sets:[{label:'4x8',logged:false},{label:'@100kg',logged:false}],note:'Derin in'},
-    {name:'Leg Press',sets:[{label:'3x12',logged:false},{label:'@160kg',logged:false}],note:''},
-    {name:'Romanian DL',sets:[{label:'3x10',logged:false},{label:'@70kg',logged:false}],note:''},
-    {name:'Calf Raise',sets:[{label:'4x15',logged:false}],note:''},
-  ]},
-  {id:4,name:'Push 2',badge:'PUŞ 2',days:[4],expanded:false,exercises:[
-    {name:'DB Shoulder Press',sets:[{label:'4x10',logged:false},{label:'@24kg',logged:false}],note:''},
-    {name:'Cable Fly',sets:[{label:'3x12',logged:false}],note:''},
-    {name:'Dips',sets:[{label:'3x10',logged:false},{label:'BW',logged:false}],note:''},
-  ]},
-  {id:5,name:'Pull 2',badge:'ÇEKİŞ 2',days:[5],expanded:false,exercises:[
-    {name:'Weighted Pull-Up',sets:[{label:'4x6',logged:false},{label:'@10kg',logged:false}],note:''},
-    {name:'Seal Row',sets:[{label:'3x10',logged:false},{label:'@60kg',logged:false}],note:''},
-    {name:'Hammer Curl',sets:[{label:'3x12',logged:false}],note:''},
-  ]},
-  {id:6,name:'Yüzme',badge:'YÜZ',days:[0,6],expanded:false,exercises:[
-    {name:'Freestyle',sets:[{label:'10x100m',logged:false}],note:'Tempolu'},
-    {name:'Sırtüstü',sets:[{label:'5x50m',logged:false}],note:''},
-  ]},
+  {id:1,name:'Push — Göğüs / Omuz / Tricep',badge:'PUŞ',days:[1],expanded:false,exercises:[{name:'Bench Press',sets:[{label:'4x8',logged:false},{label:'@80kg',logged:false}],note:'Göğüs ortası hissine odaklan'},{name:'Overhead Press',sets:[{label:'3x8',logged:false},{label:'@50kg',logged:false}],note:''},{name:'Incline DB Press',sets:[{label:'3x10',logged:false},{label:'@22kg',logged:false}],note:''},{name:'Lateral Raise',sets:[{label:'4x15',logged:false},{label:'@10kg',logged:false}],note:''},{name:'Tricep Pushdown',sets:[{label:'3x12',logged:false}],note:''}]},
+  {id:2,name:'Pull — Sırt / Bicep',badge:'ÇEKİŞ',days:[2],expanded:false,exercises:[{name:'Deadlift',sets:[{label:'4x5',logged:false},{label:'@120kg',logged:false}],note:''},{name:'Barbell Row',sets:[{label:'4x8',logged:false},{label:'@70kg',logged:false}],note:''},{name:'Pull-Up',sets:[{label:'3x8',logged:false},{label:'BW',logged:false}],note:''},{name:'Bicep Curl',sets:[{label:'3x12',logged:false}],note:''}]},
+  {id:3,name:'Legs — Bacak',badge:'BACAK',days:[3],expanded:false,exercises:[{name:'Squat',sets:[{label:'4x8',logged:false},{label:'@100kg',logged:false}],note:'Derin in'},{name:'Leg Press',sets:[{label:'3x12',logged:false},{label:'@160kg',logged:false}],note:''},{name:'Romanian DL',sets:[{label:'3x10',logged:false},{label:'@70kg',logged:false}],note:''},{name:'Calf Raise',sets:[{label:'4x15',logged:false}],note:''}]},
+  {id:4,name:'Push 2',badge:'PUŞ 2',days:[4],expanded:false,exercises:[{name:'DB Shoulder Press',sets:[{label:'4x10',logged:false},{label:'@24kg',logged:false}],note:''},{name:'Cable Fly',sets:[{label:'3x12',logged:false}],note:''},{name:'Dips',sets:[{label:'3x10',logged:false},{label:'BW',logged:false}],note:''}]},
+  {id:5,name:'Pull 2',badge:'ÇEKİŞ 2',days:[5],expanded:false,exercises:[{name:'Weighted Pull-Up',sets:[{label:'4x6',logged:false},{label:'@10kg',logged:false}],note:''},{name:'Seal Row',sets:[{label:'3x10',logged:false},{label:'@60kg',logged:false}],note:''},{name:'Hammer Curl',sets:[{label:'3x12',logged:false}],note:''}]},
+  {id:6,name:'Yüzme',badge:'YÜZ',days:[0,6],expanded:false,exercises:[{name:'Freestyle',sets:[{label:'10x100m',logged:false}],note:'Tempolu'},{name:'Sırtüstü',sets:[{label:'5x50m',logged:false}],note:''}]},
 ];
-
 const defMeals=[
-  {id:1,name:'Kahvaltı',icon:'🌅',color:'#e0a030',foods:[
-    {name:'Yumurta',amount:'3 adet',kcal:210,protein:18,carb:2,fat:15},
-    {name:'Ekmek',amount:'2 dilim',kcal:160,protein:5,carb:30,fat:2},
-  ]},
-  {id:2,name:'Öğle',icon:'☀️',color:'#40d0c0',foods:[
-    {name:'Tavuk Göğsü',amount:'200g',kcal:220,protein:42,carb:0,fat:5},
-    {name:'Pirinç',amount:'150g',kcal:195,protein:4,carb:42,fat:1},
-  ]},
-  {id:3,name:'Post-Workout',icon:'💪',color:'#40b870',foods:[
-    {name:'Whey Protein',amount:'1 ölçek',kcal:120,protein:25,carb:5,fat:2},
-    {name:'Rice Cream',amount:'50g',kcal:190,protein:2,carb:43,fat:1},
-  ]},
-  {id:4,name:'Akşam',icon:'🌙',color:'#9060e0',foods:[
-    {name:'Kırmızı Et',amount:'200g',kcal:300,protein:40,carb:0,fat:15},
-    {name:'Tatlı Patates',amount:'150g',kcal:130,protein:2,carb:30,fat:0},
-  ]},
+  {id:1,name:'Kahvaltı',icon:'🌅',color:'#e0a030',foods:[{name:'Yumurta',amount:'3 adet',kcal:210,protein:18,carb:2,fat:15},{name:'Ekmek',amount:'2 dilim',kcal:160,protein:5,carb:30,fat:2}]},
+  {id:2,name:'Öğle',icon:'☀️',color:'#40d0c0',foods:[{name:'Tavuk Göğsü',amount:'200g',kcal:220,protein:42,carb:0,fat:5},{name:'Pirinç',amount:'150g',kcal:195,protein:4,carb:42,fat:1}]},
+  {id:3,name:'Post-Workout',icon:'💪',color:'#40b870',foods:[{name:'Whey Protein',amount:'1 ölçek',kcal:120,protein:25,carb:5,fat:2},{name:'Rice Cream',amount:'50g',kcal:190,protein:2,carb:43,fat:1}]},
+  {id:4,name:'Akşam',icon:'🌙',color:'#9060e0',foods:[{name:'Kırmızı Et',amount:'200g',kcal:300,protein:40,carb:0,fat:15},{name:'Tatlı Patates',amount:'150g',kcal:130,protein:2,carb:30,fat:0}]},
 ];
 
-let saved=load();
-let S=saved||{tasks:defTasks,selectedDate:todayStr(),workout:defWorkout,meals:defMeals,macroTargets:{kcal:3200,protein:220,carb:350,fat:90},water:{glasses:8,drunk:0},mealExpanded:{},calMonth:new Date().getMonth(),calYear:new Date().getFullYear()};
-if(!S.workout) S.workout=defWorkout;
-if(!S.meals) S.meals=defMeals;
-if(!S.water) S.water={glasses:8,drunk:0};
-if(!S.mealExpanded) S.mealExpanded={};
-if(S.calMonth===undefined){S.calMonth=new Date().getMonth();S.calYear=new Date().getFullYear();}
-S.tasks.forEach(t=>{if(!t.doneByDate)t.doneByDate={};if(t.recurDays===undefined)t.recurDays=[0,1,2,3,4,5,6];});
+let S = {
+  tasks: defTasks, selectedDate: todayStr(),
+  workout: defWorkout, meals: defMeals,
+  macroTargets:{kcal:3200,protein:220,carb:350,fat:90},
+  water:{glasses:8,drunk:0}, mealExpanded:{},
+  calMonth:new Date().getMonth(), calYear:new Date().getFullYear()
+};
+
+let _saving = false;
+let _saveTimer = null;
+
+function setSyncDot(state){
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot ' + state;
+}
+
+async function saveToFirebase(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async ()=>{
+    setSyncDot('syncing');
+    try {
+      await setDoc(DOC, JSON.parse(JSON.stringify(S)));
+      setSyncDot('synced');
+    } catch(e){
+      console.error(e);
+      setSyncDot('error');
+    }
+  }, 800);
+}
+
+// Real-time listener
+let _firstLoad = true;
+onSnapshot(DOC, (snap)=>{
+  if(snap.exists()){
+    const data = snap.data();
+    S = data;
+    S.tasks.forEach(t=>{if(!t.doneByDate)t.doneByDate={};if(t.recurDays===undefined)t.recurDays=[0,1,2,3,4,5,6];});
+    if(!S.mealExpanded) S.mealExpanded={};
+    if(!S.water) S.water={glasses:8,drunk:0};
+    if(S.calMonth===undefined){S.calMonth=new Date().getMonth();S.calYear=new Date().getFullYear();}
+  }
+  if(_firstLoad){
+    _firstLoad = false;
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('mainApp').style.display='block';
+    renderAll();
+  } else {
+    renderAll();
+  }
+  setSyncDot('synced');
+}, (err)=>{
+  console.error(err);
+  // offline — still show app with local data
+  if(_firstLoad){
+    _firstLoad = false;
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('mainApp').style.display='block';
+    renderAll();
+  }
+  setSyncDot('error');
+});
+
+function renderAll(){
+  renderHeader(); renderWeek(); renderTimeline(); renderProgress();
+  renderWorkout(); renderMacroCards(); renderWater(); renderMeals();
+}
 
 function switchTab(id){
   const ids=['gunluk','antrenman','beslenme','aylik'];
@@ -358,7 +411,7 @@ function renderWeek(){
   }).join('');
 }
 
-function selectDay(ds){S.selectedDate=ds;save();renderWeek();renderHeader();renderTimeline();renderProgress();}
+window.selectDay=function(ds){S.selectedDate=ds;saveToFirebase();renderWeek();renderHeader();renderTimeline();renderProgress();}
 
 function getTasksForDate(ds){const d=parseDateStr(ds);const dayIdx=d.getDay();return S.tasks.filter(t=>t.recurDays.includes(dayIdx));}
 function isTaskDone(task,ds){return!!task.doneByDate[ds];}
@@ -410,21 +463,19 @@ function renderTimeline(){
   }).join('');
 }
 
-function toggleExpand(id){document.getElementById('expand-'+id).classList.toggle('open');}
-function toggleDone(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;const ds=S.selectedDate;t.doneByDate[ds]=!t.doneByDate[ds];save();renderTimeline();renderProgress();}
-function saveNote(id,val){const t=S.tasks.find(x=>x.id===id);if(t){t.note=val;save();}}
-function deleteTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);save();renderTimeline();renderProgress();}
+window.toggleExpand=function(id){document.getElementById('expand-'+id).classList.toggle('open');}
+window.toggleDone=function(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;const ds=S.selectedDate;t.doneByDate[ds]=!t.doneByDate[ds];saveToFirebase();renderTimeline();renderProgress();}
+window.saveNote=function(id,val){const t=S.tasks.find(x=>x.id===id);if(t){t.note=val;saveToFirebase();}}
+window.deleteTask=function(id){S.tasks=S.tasks.filter(x=>x.id!==id);saveToFirebase();renderTimeline();renderProgress();}
 
 let _taskMode='add',_editTaskId=null;
-function openAddTaskModal(){
+window.openAddTaskModal=function(){
   _taskMode='add';_editTaskId=null;
-  const d=parseDateStr(S.selectedDate);const defaultDay=d.getDay();
-  showModal(taskModalHTML(null,defaultDay));
+  const d=parseDateStr(S.selectedDate);showModal(taskModalHTML(null,d.getDay()));
 }
-function openEditTaskModal(id){
+window.openEditTaskModal=function(id){
   _taskMode='edit';_editTaskId=id;
-  const t=S.tasks.find(x=>x.id===id);
-  showModal(taskModalHTML(t,null));
+  showModal(taskModalHTML(S.tasks.find(x=>x.id===id),null));
 }
 function taskModalHTML(t,defaultDay){
   const recurDays=t?t.recurDays:(defaultDay!==null?[defaultDay]:[0,1,2,3,4,5,6]);
@@ -449,21 +500,20 @@ function taskModalHTML(t,defaultDay){
       <button class="btn primary" onclick="saveTaskModal()">Kaydet</button>
     </div>`;
 }
-function saveTaskModal(){
+window.saveTaskModal=function(){
   const time=document.getElementById('mTime').value;
   const title=document.getElementById('mTitle').value.trim();if(!title)return;
-  const tagsRaw=document.getElementById('mTags').value;
   const color=document.getElementById('mColor').value;
   const note=document.getElementById('mNote').value;
   const recurDays=[...document.querySelectorAll('#dayCbs .day-cb.on')].map(el=>+el.dataset.day);
-  const tags=tagsRaw.split(',').map(s=>s.trim()).filter(Boolean).map(label=>({label,color}));
+  const tags=document.getElementById('mTags').value.split(',').map(s=>s.trim()).filter(Boolean).map(label=>({label,color}));
   if(_taskMode==='add'){
     S.tasks.push({id:Date.now(),time,title,tags,note,highlight:'',recurDays,doneByDate:{}});
   } else {
     const t=S.tasks.find(x=>x.id===_editTaskId);
     if(t){t.time=time;t.title=title;t.tags=tags;t.note=note;t.recurDays=recurDays;}
   }
-  save();closeModal();renderTimeline();renderProgress();renderWeek();
+  saveToFirebase();closeModal();renderTimeline();renderProgress();renderWeek();
 }
 
 function renderWorkout(){
@@ -476,8 +526,8 @@ function renderWorkout(){
       const setsHTML=ex.sets.map((s,si)=>`
         <span class="set-chip ${s.logged?'logged':''}">
           <input value="${s.label}" onchange="updateSetLabel(${wi},${ei},${si},this.value)">
-          <button class="set-chip-btn" onclick="toggleSetLog(${wi},${ei},${si})" title="Tamamlandı/Geri al">${s.logged?'✓':'○'}</button>
-          <button class="set-chip-btn" onclick="deleteSet(${wi},${ei},${si})" title="Sil">✕</button>
+          <button class="set-chip-btn" onclick="toggleSetLog(${wi},${ei},${si})">${s.logged?'✓':'○'}</button>
+          <button class="set-chip-btn" onclick="deleteSet(${wi},${ei},${si})">✕</button>
         </span>`).join('');
       return `<div class="ex-item">
         <div class="ex-top">
@@ -492,10 +542,7 @@ function renderWorkout(){
     return `<div class="wd-card ${isToday?'today-wd':''}">
       <div class="wd-head" onclick="toggleWD(${wi})">
         <span class="wd-name">${w.name}</span>
-        <div class="wd-badges">
-          <span class="wd-badge">${w.badge}</span>
-          <span style="font-size:11px;color:var(--muted)">${w.expanded?'▲':'▼'}</span>
-        </div>
+        <div class="wd-badges"><span class="wd-badge">${w.badge}</span><span style="font-size:11px;color:var(--muted)">${w.expanded?'▲':'▼'}</span></div>
       </div>
       <div class="wd-expand ${w.expanded?'open':''}" id="wd-exp-${wi}">
         <div style="padding:4px 14px 4px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;">Günler</div>
@@ -516,46 +563,39 @@ function renderWorkout(){
   }).join('');
 }
 
-function toggleWD(wi){S.workout[wi].expanded=!S.workout[wi].expanded;save();renderWorkout();}
-function toggleWDDay(wi,day){const w=S.workout[wi];const idx=w.days.indexOf(day);if(idx>=0)w.days.splice(idx,1);else w.days.push(day);save();renderWorkout();}
-function updateExName(wi,ei,val){S.workout[wi].exercises[ei].name=val;save();}
-function updateExNote(wi,ei,val){S.workout[wi].exercises[ei].note=val;save();}
-function updateSetLabel(wi,ei,si,val){S.workout[wi].exercises[ei].sets[si].label=val;save();}
-function toggleSetLog(wi,ei,si){S.workout[wi].exercises[ei].sets[si].logged=!S.workout[wi].exercises[ei].sets[si].logged;save();renderWorkout();}
-function deleteSet(wi,ei,si){S.workout[wi].exercises[ei].sets.splice(si,1);save();renderWorkout();}
-function addSet(wi,ei){S.workout[wi].exercises[ei].sets.push({label:'3x10',logged:false});save();renderWorkout();}
-function deleteExercise(wi,ei){S.workout[wi].exercises.splice(ei,1);save();renderWorkout();}
-function addExercise(wi){const inp=document.getElementById('newEx-'+wi);const name=inp.value.trim();if(!name)return;S.workout[wi].exercises.push({name,sets:[{label:'3x10',logged:false}],note:''});inp.value='';save();renderWorkout();}
-function deleteWorkout(wi){if(!confirm('Bu programı silmek istediğine emin misin?'))return;S.workout.splice(wi,1);save();renderWorkout();}
-
-function openAddWorkoutModal(){
+window.toggleWD=function(wi){S.workout[wi].expanded=!S.workout[wi].expanded;saveToFirebase();renderWorkout();}
+window.toggleWDDay=function(wi,day){const w=S.workout[wi];const idx=w.days.indexOf(day);if(idx>=0)w.days.splice(idx,1);else w.days.push(day);saveToFirebase();renderWorkout();}
+window.updateExName=function(wi,ei,val){S.workout[wi].exercises[ei].name=val;saveToFirebase();}
+window.updateExNote=function(wi,ei,val){S.workout[wi].exercises[ei].note=val;saveToFirebase();}
+window.updateSetLabel=function(wi,ei,si,val){S.workout[wi].exercises[ei].sets[si].label=val;saveToFirebase();}
+window.toggleSetLog=function(wi,ei,si){S.workout[wi].exercises[ei].sets[si].logged=!S.workout[wi].exercises[ei].sets[si].logged;saveToFirebase();renderWorkout();}
+window.deleteSet=function(wi,ei,si){S.workout[wi].exercises[ei].sets.splice(si,1);saveToFirebase();renderWorkout();}
+window.addSet=function(wi,ei){S.workout[wi].exercises[ei].sets.push({label:'3x10',logged:false});saveToFirebase();renderWorkout();}
+window.deleteExercise=function(wi,ei){S.workout[wi].exercises.splice(ei,1);saveToFirebase();renderWorkout();}
+window.addExercise=function(wi){const inp=document.getElementById('newEx-'+wi);const name=inp.value.trim();if(!name)return;S.workout[wi].exercises.push({name,sets:[{label:'3x10',logged:false}],note:''});inp.value='';saveToFirebase();renderWorkout();}
+window.deleteWorkout=function(wi){if(!confirm('Bu programı silmek istediğine emin misin?'))return;S.workout.splice(wi,1);saveToFirebase();renderWorkout();}
+window.openAddWorkoutModal=function(){
   showModal(`<h3>Yeni Antrenman Programı</h3>
     <label>Program Adı</label><input type="text" id="wName" placeholder="örn: Push — Göğüs / Omuz">
     <label>Kısa Etiket</label><input type="text" id="wBadge" placeholder="örn: PUŞ">
     <label>Günler</label>
     <div class="day-checkboxes" id="wDayCbs">${DAYS_TR.map((d,i)=>`<span class="day-cb" onclick="this.classList.toggle('on')" data-day="${i}">${d}</span>`).join('')}</div>
-    <div class="modal-btns">
-      <button class="mini-btn" onclick="closeModal()">İptal</button>
-      <button class="btn primary" onclick="saveNewWorkout()">Ekle</button>
-    </div>`);
+    <div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveNewWorkout()">Ekle</button></div>`);
 }
-function openEditWDModal(wi){
+window.openEditWDModal=function(wi){
   const w=S.workout[wi];
   showModal(`<h3>Program Adını Düzenle</h3>
     <label>Program Adı</label><input type="text" id="wNameE" value="${w.name}">
     <label>Kısa Etiket</label><input type="text" id="wBadgeE" value="${w.badge}">
-    <div class="modal-btns">
-      <button class="mini-btn" onclick="closeModal()">İptal</button>
-      <button class="btn primary" onclick="saveEditWD(${wi})">Kaydet</button>
-    </div>`);
+    <div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveEditWD(${wi})">Kaydet</button></div>`);
 }
-function saveEditWD(wi){S.workout[wi].name=document.getElementById('wNameE').value.trim()||S.workout[wi].name;S.workout[wi].badge=document.getElementById('wBadgeE').value.trim()||S.workout[wi].badge;save();closeModal();renderWorkout();}
-function saveNewWorkout(){
+window.saveEditWD=function(wi){S.workout[wi].name=document.getElementById('wNameE').value.trim()||S.workout[wi].name;S.workout[wi].badge=document.getElementById('wBadgeE').value.trim()||S.workout[wi].badge;saveToFirebase();closeModal();renderWorkout();}
+window.saveNewWorkout=function(){
   const name=document.getElementById('wName').value.trim();if(!name)return;
   const badge=document.getElementById('wBadge').value.trim()||name.slice(0,4).toUpperCase();
   const days=[...document.querySelectorAll('#wDayCbs .day-cb.on')].map(el=>+el.dataset.day);
   S.workout.push({id:Date.now(),name,badge,days,expanded:true,exercises:[]});
-  save();closeModal();renderWorkout();
+  saveToFirebase();closeModal();renderWorkout();
 }
 
 function renderCalendar(){
@@ -578,7 +618,7 @@ function renderCalendar(){
     <div class="mstat"><div class="mstat-val" style="color:var(--green)">${totalDone}</div><div class="mstat-label">Görev yapıldı</div></div>
     <div class="mstat"><div class="mstat-val" style="color:var(--pink)">${totalTasks?Math.round((totalDone/totalTasks)*100):0}%</div><div class="mstat-label">Başarı oranı</div></div>`;
   let html=DAYS_TR.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
-  for(let i=0;i<firstDay;i++) html+=`<div class="cal-cell empty"></div>`;
+  for(let i=0;i<firstDay;i++)html+=`<div class="cal-cell empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dayIdx=new Date(yr,mo,d).getDay();
@@ -593,13 +633,8 @@ function renderCalendar(){
   }
   document.getElementById('calGrid').innerHTML=html;
 }
-function changeMonth(dir){
-  S.calMonth+=dir;
-  if(S.calMonth>11){S.calMonth=0;S.calYear++;}
-  if(S.calMonth<0){S.calMonth=11;S.calYear--;}
-  save();renderCalendar();
-}
-function calSelectDay(ds){S.selectedDate=ds;save();renderCalendar();renderWeek();renderHeader();renderTimeline();renderProgress();}
+window.changeMonth=function(dir){S.calMonth+=dir;if(S.calMonth>11){S.calMonth=0;S.calYear++;}if(S.calMonth<0){S.calMonth=11;S.calYear--;}saveToFirebase();renderCalendar();}
+window.calSelectDay=function(ds){S.selectedDate=ds;saveToFirebase();renderCalendar();renderWeek();renderHeader();renderTimeline();renderProgress();}
 
 function calcMacros(){let kcal=0,protein=0,carb=0,fat=0;S.meals.forEach(m=>m.foods.forEach(f=>{kcal+=f.kcal||0;protein+=f.protein||0;carb+=f.carb||0;fat+=f.fat||0;}));return{kcal,protein,carb,fat};}
 function renderMacroCards(){
@@ -614,7 +649,7 @@ function renderWater(){
   let html='';for(let i=0;i<w.glasses;i++)html+=`<div class="glass ${i<w.drunk?'filled':''}" onclick="toggleGlass(${i})">💧</div>`;
   document.getElementById('waterGlasses').innerHTML=html;
 }
-function toggleGlass(i){S.water.drunk=(i<S.water.drunk)?i:i+1;save();renderWater();}
+window.toggleGlass=function(i){S.water.drunk=(i<S.water.drunk)?i:i+1;saveToFirebase();renderWater();}
 function renderMeals(){
   document.getElementById('mealList').innerHTML=S.meals.map(meal=>{
     const totKcal=meal.foods.reduce((s,f)=>s+(f.kcal||0),0);
@@ -631,12 +666,12 @@ function renderMeals(){
         <div class="meal-detail">
           ${foodRows}
           <div class="add-food-row">
-            <input class="mini-input" style="flex:2;min-width:90px" id="fn-${meal.id}" placeholder="Besin adı">
-            <input class="mini-input" style="width:60px" id="fa-${meal.id}" placeholder="Miktar">
-            <input class="mini-input" style="width:48px" id="fc-${meal.id}" type="number" placeholder="kcal">
-            <input class="mini-input" style="width:38px" id="fp-${meal.id}" type="number" placeholder="pro">
-            <input class="mini-input" style="width:38px" id="fk-${meal.id}" type="number" placeholder="k">
-            <input class="mini-input" style="width:38px" id="ff-${meal.id}" type="number" placeholder="yağ">
+            <input class="mini-input" style="flex:2;min-width:80px" id="fn-${meal.id}" placeholder="Besin adı">
+            <input class="mini-input" style="width:58px" id="fa-${meal.id}" placeholder="Miktar">
+            <input class="mini-input" style="width:46px" id="fc-${meal.id}" type="number" placeholder="kcal">
+            <input class="mini-input" style="width:36px" id="fp-${meal.id}" type="number" placeholder="pro">
+            <input class="mini-input" style="width:36px" id="fk-${meal.id}" type="number" placeholder="k">
+            <input class="mini-input" style="width:36px" id="ff-${meal.id}" type="number" placeholder="yağ">
             <button class="mini-btn" onclick="addFood(${meal.id})">+</button>
           </div>
           <div class="edit-row" style="margin-top:7px"><button class="mini-btn danger" onclick="deleteMeal(${meal.id})">Öğünü Sil</button></div>
@@ -645,19 +680,20 @@ function renderMeals(){
     </div>`;
   }).join('');
 }
-function toggleMeal(id){S.mealExpanded[id]=!S.mealExpanded[id];save();renderMeals();}
-function addFood(mealId){const meal=S.meals.find(m=>m.id===mealId);if(!meal)return;const name=document.getElementById('fn-'+mealId).value.trim();if(!name)return;meal.foods.push({name,amount:document.getElementById('fa-'+mealId).value||'',kcal:parseFloat(document.getElementById('fc-'+mealId).value)||0,protein:parseFloat(document.getElementById('fp-'+mealId).value)||0,carb:parseFloat(document.getElementById('fk-'+mealId).value)||0,fat:parseFloat(document.getElementById('ff-'+mealId).value)||0});save();renderMeals();renderMacroCards();}
-function deleteFood(mealId,fi){const meal=S.meals.find(m=>m.id===mealId);if(meal){meal.foods.splice(fi,1);save();renderMeals();renderMacroCards();}}
-function deleteMeal(mealId){S.meals=S.meals.filter(m=>m.id!==mealId);save();renderMeals();renderMacroCards();}
-function openAddMealModal(){showModal(`<h3>Yeni Öğün</h3><label>Ad</label><input type="text" id="mnName" placeholder="Kahvaltı, Öğle..."><label>İkon (emoji)</label><input type="text" id="mnIcon" value="🍽️" maxlength="2"><label>Renk (hex)</label><input type="text" id="mnColor" value="#e0a030"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMeal()">Ekle</button></div>`);}
-function saveMeal(){const name=document.getElementById('mnName').value.trim();if(!name)return;S.meals.push({id:Date.now(),name,icon:document.getElementById('mnIcon').value||'🍽️',color:document.getElementById('mnColor').value||'#e0a030',foods:[]});save();closeModal();renderMeals();renderMacroCards();}
-function openMacroTargetModal(){const t=S.macroTargets;showModal(`<h3>Makro Hedefleri</h3><label>Kalori (kcal)</label><input type="number" id="tKcal" value="${t.kcal}"><label>Protein (g)</label><input type="number" id="tPro" value="${t.protein}"><label>Karbonhidrat (g)</label><input type="number" id="tCarb" value="${t.carb}"><label>Yağ (g)</label><input type="number" id="tFat" value="${t.fat}"><label>Su (bardak)</label><input type="number" id="tWater" value="${S.water.glasses}"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMacroTargets()">Kaydet</button></div>`);}
-function saveMacroTargets(){S.macroTargets={kcal:parseInt(document.getElementById('tKcal').value)||3200,protein:parseInt(document.getElementById('tPro').value)||220,carb:parseInt(document.getElementById('tCarb').value)||350,fat:parseInt(document.getElementById('tFat').value)||90};S.water.glasses=parseInt(document.getElementById('tWater').value)||8;save();closeModal();renderMacroCards();renderWater();}
+window.toggleMeal=function(id){S.mealExpanded[id]=!S.mealExpanded[id];saveToFirebase();renderMeals();}
+window.addFood=function(mealId){const meal=S.meals.find(m=>m.id===mealId);if(!meal)return;const name=document.getElementById('fn-'+mealId).value.trim();if(!name)return;meal.foods.push({name,amount:document.getElementById('fa-'+mealId).value||'',kcal:parseFloat(document.getElementById('fc-'+mealId).value)||0,protein:parseFloat(document.getElementById('fp-'+mealId).value)||0,carb:parseFloat(document.getElementById('fk-'+mealId).value)||0,fat:parseFloat(document.getElementById('ff-'+mealId).value)||0});saveToFirebase();renderMeals();renderMacroCards();}
+window.deleteFood=function(mealId,fi){const meal=S.meals.find(m=>m.id===mealId);if(meal){meal.foods.splice(fi,1);saveToFirebase();renderMeals();renderMacroCards();}}
+window.deleteMeal=function(mealId){S.meals=S.meals.filter(m=>m.id!==mealId);saveToFirebase();renderMeals();renderMacroCards();}
+window.openAddMealModal=function(){showModal(`<h3>Yeni Öğün</h3><label>Ad</label><input type="text" id="mnName" placeholder="Kahvaltı, Öğle..."><label>İkon (emoji)</label><input type="text" id="mnIcon" value="🍽️" maxlength="2"><label>Renk (hex)</label><input type="text" id="mnColor" value="#e0a030"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMeal()">Ekle</button></div>`);}
+window.saveMeal=function(){const name=document.getElementById('mnName').value.trim();if(!name)return;S.meals.push({id:Date.now(),name,icon:document.getElementById('mnIcon').value||'🍽️',color:document.getElementById('mnColor').value||'#e0a030',foods:[]});saveToFirebase();closeModal();renderMeals();renderMacroCards();}
+window.openMacroTargetModal=function(){const t=S.macroTargets;showModal(`<h3>Makro Hedefleri</h3><label>Kalori (kcal)</label><input type="number" id="tKcal" value="${t.kcal}"><label>Protein (g)</label><input type="number" id="tPro" value="${t.protein}"><label>Karbonhidrat (g)</label><input type="number" id="tCarb" value="${t.carb}"><label>Yağ (g)</label><input type="number" id="tFat" value="${t.fat}"><label>Su (bardak)</label><input type="number" id="tWater" value="${S.water.glasses}"><div class="modal-btns"><button class="mini-btn" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveMacroTargets()">Kaydet</button></div>`);}
+window.saveMacroTargets=function(){S.macroTargets={kcal:parseInt(document.getElementById('tKcal').value)||3200,protein:parseInt(document.getElementById('tPro').value)||220,carb:parseInt(document.getElementById('tCarb').value)||350,fat:parseInt(document.getElementById('tFat').value)||90};S.water.glasses=parseInt(document.getElementById('tWater').value)||8;saveToFirebase();closeModal();renderMacroCards();renderWater();}
 
-function showModal(html){document.getElementById('modalInner').innerHTML=html;document.getElementById('modal').style.display='flex';}
-function closeModal(){document.getElementById('modal').style.display='none';}
+window.showModal=function(html){document.getElementById('modalInner').innerHTML=html;document.getElementById('modal').style.display='flex';}
+window.closeModal=function(){document.getElementById('modal').style.display='none';}
+function showModal(html){window.showModal(html);}
+function closeModal(){window.closeModal();}
 
-renderHeader();renderWeek();renderTimeline();renderProgress();renderWorkout();renderMacroCards();renderWater();renderMeals();
 </script>
 </body>
 </html>
